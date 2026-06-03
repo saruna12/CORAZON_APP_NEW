@@ -118,7 +118,7 @@ class HasilTestPage extends StatelessWidget {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Soal Pilihan Ganda', style: TextStyle(fontWeight: FontWeight.bold, color: navyColor)),
+                      const Text('Soal Pilihan Ganda', style: TextStyle(fontWeight: FontWeight.bold, color: navyColor)),
                       Icon(isBenar ? Icons.check_circle : Icons.cancel, color: isBenar ? Colors.green : Colors.red),
                     ],
                   ),

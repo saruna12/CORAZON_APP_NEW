@@ -114,7 +114,7 @@ class _PreTestPageState extends State<PreTestPage> {
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(color: maroonColor.withOpacity(0.1), borderRadius: BorderRadius.circular(20)),
+                    decoration: BoxDecoration(color: maroonColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
                     child: Text(_getFormattedTime(), style: const TextStyle(color: maroonColor, fontWeight: FontWeight.bold, fontSize: 14)),
                   ),
                 ],
@@ -206,7 +206,7 @@ class _PreTestPageState extends State<PreTestPage> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? maroonColor.withOpacity(0.05) : Colors.white,
+          color: isSelected ? maroonColor.withValues(alpha: 0.05) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: isSelected ? maroonColor : const Color(0xFFE0E0E0), width: isSelected ? 2 : 1),
         ),

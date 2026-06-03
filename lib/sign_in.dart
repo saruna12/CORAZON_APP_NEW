@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'beranda.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -131,7 +132,17 @@ class _SignInPageState extends State<SignInPage> {
                         ),
                       ),
                       onPressed: () {
-                        // Aksi tombol login
+                        if (_usernameController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Masukkan username dan password')),
+                          );
+                          return;
+                        }
+
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const BerandaPage()),
+                        );
                       },
                       child: const Text(
                         'SIGN IN',
