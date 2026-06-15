@@ -13,7 +13,7 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // Fungsi Timer: Menunggu selama 3 detik, lalu pindah ke SignInPage
     Timer(const Duration(seconds: 3), () {
       Navigator.pushReplacement(
@@ -40,7 +40,8 @@ class _SplashScreenState extends State<SplashScreen> {
               height: 180,
               fit: BoxFit.contain,
               errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.favorite, size: 150, color: maroonColor);
+                return const Icon(Icons.favorite,
+                    size: 150, color: maroonColor);
               },
             ),
             const SizedBox(height: 24),

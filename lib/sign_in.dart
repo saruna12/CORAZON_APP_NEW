@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'beranda.dart';
+import 'dosen/dosen_beranda_page.dart';
+import 'package:corazon_clean/register_page.dart';
 
 class SignInPage extends StatefulWidget {
   const SignInPage({super.key});
@@ -18,12 +20,13 @@ class _SignInPageState extends State<SignInPage> {
     _passwordController.dispose();
     super.dispose();
   }
+
   @override
   Widget build(BuildContext context) {
     const maroonColor = Color(0xFF801A24);
 
     return Scaffold(
-      backgroundColor: maroonColor, // Background merah marun
+      backgroundColor: maroonColor,
       body: Center(
         child: SingleChildScrollView(
           child: Padding(
@@ -31,55 +34,50 @@ class _SignInPageState extends State<SignInPage> {
             child: Container(
               padding: const EdgeInsets.all(24.0),
               decoration: BoxDecoration(
-                color: Colors.white, // Menggunakan 'C' besar
-                borderRadius: BorderRadius.circular(24.0), // Kotak putih melengkung
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24.0),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const SizedBox(height: 10),
-                  
-                  // Label Username
                   const Text(
-                    'Username',
+                    'Username / Nama',
                     style: TextStyle(
-                      fontSize: 14, 
-                      fontWeight: FontWeight.w500, 
-                      color: Colors.black87, // FIX: Menggunakan warna resmi Flutter
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
-                  // Input Username Abu-abu
                   Container(
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE0E0E0), 
+                      color: const Color(0xFFE0E0E0),
                       borderRadius: BorderRadius.circular(8.0),
                     ),
                     child: TextField(
                       controller: _usernameController,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        hintText: 'Masukkan nama Anda',
+                        hintStyle:
+                            TextStyle(color: Colors.black38, fontSize: 13),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       ),
                     ),
                   ),
-                  
                   const SizedBox(height: 20),
-                  
-                  // Label Password
                   const Text(
-                    'Password',
+                    'NPM / Password',
                     style: TextStyle(
-                      fontSize: 14, 
-                      fontWeight: FontWeight.w500, 
-                      color: Colors.black87, // FIX: Menggunakan warna resmi Flutter
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.black87,
                     ),
                   ),
                   const SizedBox(height: 8),
-                  
-                  // Input Password Abu-abu
                   Container(
                     decoration: BoxDecoration(
                       color: const Color(0xFFE0E0E0),
@@ -90,36 +88,42 @@ class _SignInPageState extends State<SignInPage> {
                       obscureText: true,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        hintText: 'Masukkan NPM untuk Mahasiswa',
+                        hintStyle:
+                            TextStyle(color: Colors.black38, fontSize: 13),
+                        contentPadding:
+                            EdgeInsets.symmetric(horizontal: 12, vertical: 14),
                       ),
                     ),
                   ),
-                  
                   const SizedBox(height: 20),
-                  
-                  // Teks Create Account bawah
                   Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       const Text(
-                        "Don't have an account? ", 
-                        style: TextStyle(fontSize: 12, color: Colors.black87), // FIX
+                        "Don't have an account? ",
+                        style: TextStyle(fontSize: 12, color: Colors.black87),
                       ),
                       GestureDetector(
                         onTap: () {
-                          // Aksi daftar akun baru
+                          // Pindah ke halaman Register
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const RegisterPage()),
+                          );
                         },
                         child: const Text(
                           "create account",
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: maroonColor),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: maroonColor),
                         ),
                       ),
                     ],
                   ),
-                  
                   const SizedBox(height: 24),
-
-                  // Tombol Sign In Utama
                   SizedBox(
                     width: double.infinity,
                     height: 48,
@@ -132,21 +136,65 @@ class _SignInPageState extends State<SignInPage> {
                         ),
                       ),
                       onPressed: () {
-                        if (_usernameController.text.trim().isEmpty || _passwordController.text.trim().isEmpty) {
+                        // Ambil string mentah tanpa trim/lowercase bawaan biar tidak merusak memori sensor password stuy
+                        String username = _usernameController.text;
+                        String password = _passwordController.text;
+
+                        if (username.isEmpty || password.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Masukkan username dan password')),
+                            const SnackBar(
+                                content:
+                                    Text('Masukkan username dan password')),
                           );
                           return;
                         }
 
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const BerandaPage()),
-                        );
+                        // ================= JALUR 1: DATA STAF / PENGELOLA LAB (DOSEN/LABORAN) =================
+                        if ((username == 'dosen' && password == 'dosen123') ||
+                            (username == 'laboran' &&
+                                password == 'laboran123') ||
+                            (username == 'asdos' && password == 'asdos123') ||
+                            (username == 'admin' && password == 'admin123')) {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                                builder: (context) => const DosenBerandaPage()),
+                          );
+
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                                content: Text(
+                                    'Login Sukses sebagai ${username.toUpperCase()}')),
+                          );
+                        }
+                        // ================= JALUR 2: DATA MAHASISWA BIASA =================
+                        else {
+                          // Jalur Mahasiswa: Cek apakah password berupa NPM (Angka)
+                          final isNumber =
+                              RegExp(r'^[0-9]+$').hasMatch(password);
+
+                          if (!isNumber) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                    'Login Gagal! Password Mahasiswa harus berupa NPM (Angka) / Gunakan Akun Staf'),
+                              ),
+                            );
+                          } else {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    BerandaPage(namaMahasiswa: username),
+                              ),
+                            );
+                          }
+                        }
                       },
                       child: const Text(
                         'SIGN IN',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 16),
                       ),
                     ),
                   ),
