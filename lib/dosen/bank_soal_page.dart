@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../pretest_repository.dart'; // Mengarah ke file repository di luar folder dosen
 
 class BankSoalPage extends StatefulWidget {
   const BankSoalPage({super.key});
@@ -12,66 +14,149 @@ class _BankSoalPageState extends State<BankSoalPage> {
   final Color maroonPrimary = const Color(0xFF6B1D2F);
   final Color textDark = const Color(0xFF2C2C2C);
 
-  // Data contoh simulasi butir soal
-  final List<Map<String, dynamic>> _dummyQuestions = [
-    {
-      'question':
-          'Tulang terbesar dan terkuat pada tubuh manusia yang menyusun bagian paha adalah...',
-      'answers': ['Femur', 'Humerus', 'Tibia', 'Fibula'],
-      'correctIndex': 0
-    },
-    {
-      'question':
-          'Otot yang terletak di lengan atas bagian depan dan berfungsi untuk fleksi siku adalah...',
-      'answers': [
-        'Triceps Brachii',
-        'Biceps Brachii',
-        'Deltoid',
-        'Pectoralis Major'
-      ],
-      'correctIndex': 1
-    }
-  ];
+  // Controller untuk Form Input Soal Baru
+  final _formKey = GlobalKey<FormState>();
+  final _pertanyaanController = TextEditingController();
+  final List<TextEditingController> _opsiController =
+      List.generate(4, (_) => TextEditingController());
+  int _jawabanBenarIndex = 0; // 0=A, 1=B, 2=C, 3=D
 
-  // Fungsi memunculkan pop-up tambah soal baru (Simulasi)
+  // Fungsi memunculkan Bottom Sheet Input Soal ke Firestore
   void _showAddQuestionDialog() {
-    showDialog(
+    showModalBottomSheet(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        title: Row(
-          children: [
-            Icon(Icons.add_task, color: maroonPrimary),
-            const SizedBox(width: 10),
-            const Text('Tambah Soal Pretest',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          ],
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context)
+              .viewInsets
+              .bottom, // Menghindari ketutup keyboard
+          top: 20, left: 16, right: 16,
         ),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Fitur ketik soal baru sedang dalam pengembangan sistem database utama.',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+        child: SingleChildScrollView(
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.add_task, color: maroonPrimary),
+                    const SizedBox(width: 10),
+                    const Text(
+                      'Tambah Soal Pretest Baru',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Divider(),
+                TextFormField(
+                  controller: _pertanyaanController,
+                  decoration: const InputDecoration(
+                    labelText: 'Pertanyaan Soal',
+                    alignLabelWithHint: true,
+                  ),
+                  maxLines: 3,
+                  validator: (v) =>
+                      v!.isEmpty ? 'Pertanyaan wajib diisi' : null,
+                ),
+                const SizedBox(height: 10),
+                ...List.generate(4, (index) {
+                  String labelOpsi = String.fromCharCode(65 + index);
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8.0),
+                    child: TextFormField(
+                      controller: _opsiController[index],
+                      decoration: InputDecoration(
+                        labelText: 'Pilihan Konten Opsi $labelOpsi',
+                        prefixIcon: Icon(Icons.arrow_right,
+                            color: maroonPrimary, size: 18),
+                      ),
+                      validator: (v) =>
+                          v!.isEmpty ? 'Pilihan $labelOpsi wajib diisi' : null,
+                    ),
+                  );
+                }),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<int>(
+                  initialValue:
+                      _jawabanBenarIndex, // SUDAH DIPERBAIKI: menggunakan initialValue
+                  decoration: const InputDecoration(
+                    labelText: 'Kunci Jawaban Benar',
+                    prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 0, child: Text('Opsi A')),
+                    DropdownMenuItem(value: 1, child: Text('Opsi B')),
+                    DropdownMenuItem(value: 2, child: Text('Opsi C')),
+                    DropdownMenuItem(value: 3, child: Text('Opsi D')),
+                  ],
+                  onChanged: (val) => setState(() => _jawabanBenarIndex = val!),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: maroonPrimary,
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: _simpanSoalKeFirestore,
+                  child: const Text(
+                    'Simpan Ke Bank Soal',
+                    style: TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
-            SizedBox(height: 8),
-            Text(
-              'Saat ini butir soal otomatis tersinkronisasi langsung ke lembar ujian mahasiswa (TestPage).',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('OK',
-                style: TextStyle(
-                    color: maroonPrimary, fontWeight: FontWeight.bold)),
           ),
-        ],
+        ),
       ),
     );
+  }
+
+  // Fungsi simpan data asli ke Firestore
+  void _simpanSoalKeFirestore() async {
+    if (_formKey.currentState!.validate()) {
+      await FirebaseFirestore.instance.collection('soal_pretest').add({
+        'pertanyaan': _pertanyaanController.text.trim(),
+        'opsi': _opsiController.map((c) => c.text.trim()).toList(),
+        'jawaban_benar': _jawabanBenarIndex,
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
+      if (mounted) {
+        Navigator.pop(context); // Tutup bottom sheet setelah sukses
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Soal berhasil disimpan ke Firestore!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Reset isi textfield agar bersih saat dibuka kembali
+        _pertanyaanController.clear();
+        for (var c in _opsiController) {
+          c.clear();
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _pertanyaanController.dispose();
+    for (var c in _opsiController) {
+      c.dispose();
+    }
+    super.dispose();
   }
 
   @override
@@ -87,124 +172,196 @@ class _BankSoalPageState extends State<BankSoalPage> {
         backgroundColor: maroonPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: _dummyQuestions.length,
-        itemBuilder: (context, qIndex) {
-          final item = _dummyQuestions[qIndex];
-
-          return Card(
+      body: Column(
+        children: [
+          // Sakelar Akses Ujian Live di bagian atas
+          Card(
+            margin: const EdgeInsets.all(16),
             elevation: 0,
-            margin: const EdgeInsets.only(bottom: 16),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(color: Colors.grey.shade200),
             ),
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Label Nomor Soal stuy (SUDAH DIPERBAIKI MENJADI spaceBetween)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: maroonPrimary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Pilihan Ganda - No. ${qIndex + 1}',
-                          style: TextStyle(
-                              color: maroonPrimary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      const Icon(Icons.more_vert, color: Colors.grey, size: 20),
-                    ],
+            child: ValueListenableBuilder<bool>(
+              valueListenable: PretestRepository.statusUjianLive,
+              builder: (context, isLive, child) {
+                return SwitchListTile(
+                  title: const Text(
+                    "Status Akses Pretest Mahasiswa",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                   ),
-                  const SizedBox(height: 12),
-
-                  // Teks Pertanyaan
-                  Text(
-                    item['question'],
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: textDark,
-                        fontSize: 14),
+                  subtitle: Text(
+                    isLive
+                        ? "Ujian LIVE (Terbuka)"
+                        : "Ujian DITUTUP (Terkunci)",
+                    style: const TextStyle(fontSize: 12),
                   ),
-                  const SizedBox(height: 12),
+                  value: isLive,
+                  activeThumbColor:
+                      maroonPrimary, // SUDAH DIPERBAIKI: menggunakan activeThumbColor
+                  activeTrackColor: maroonPrimary.withValues(alpha: 0.3),
+                  onChanged: (value) =>
+                      PretestRepository.ubahStatusUjian(value),
+                );
+              },
+            ),
+          ),
 
-                  // List Pilihan Jawaban A, B, C, D
-                  ...List.generate(item['answers'].length, (aIndex) {
-                    bool isCorrect = aIndex == item['correctIndex'];
-
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                          vertical: 4), // SUDAH DIPERBAIKI KE MARGIN
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: isCorrect ? Colors.green[50] : Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                        // SUDAH DIPERBAIKI MENGGUNAKAN Border.all
-                        border: Border.all(
-                          color: isCorrect
-                              ? Colors.green.shade300
-                              : Colors.grey.shade200,
-                          width: 1,
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          // Lingkaran Huruf A/B/C/D
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor: isCorrect
-                                ? Colors.green[600]
-                                : Colors.grey[300],
-                            child: Text(
-                              String.fromCharCode(65 + aIndex),
-                              style: const TextStyle(
-                                  fontSize: 10,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-
-                          // Teks Opsi Jawaban
-                          Expanded(
-                            child: Text(
-                              item['answers'][aIndex],
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: isCorrect ? Colors.green[900] : textDark,
-                                fontWeight: isCorrect
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ),
-
-                          // Tanda Centang Kunci Jawaban stuy
-                          if (isCorrect)
-                            const Icon(Icons.check_circle,
-                                color: Colors.green, size: 18),
-                        ],
-                      ),
-                    );
-                  }),
-                ],
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 18.0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                "Daftar Soal di Database:",
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey,
+                    fontSize: 13),
               ),
             ),
-          );
-        },
+          ),
+          const SizedBox(height: 8),
+
+          // List Soal Real-time dari Firestore menggunakan StreamBuilder
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('soal_pretest')
+                  .orderBy('timestamp', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                  return const Center(
+                    child: Text(
+                        "Belum ada soal di database. Silakan tambah soal."),
+                  );
+                }
+
+                var docs = snapshot.data!.docs;
+
+                return ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  itemCount: docs.length,
+                  itemBuilder: (context, qIndex) {
+                    var item = docs[qIndex].data() as Map<String, dynamic>;
+                    String pertanyaan = item['pertanyaan'] ?? '';
+                    List<String> opsi = List<String>.from(item['opsi'] ?? []);
+                    int jawabanBenar = item['jawaban_benar'] ?? 0;
+
+                    return Card(
+                      elevation: 0,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: maroonPrimary.withValues(
+                                        alpha:
+                                            0.1), // SUDAH DIPERBAIKI: menggunakan withValues
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    'Pilihan Ganda - No. ${qIndex + 1}',
+                                    style: TextStyle(
+                                        color: maroonPrimary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                ),
+                                const Icon(Icons.more_vert,
+                                    color: Colors.grey, size: 20),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              pertanyaan,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: textDark,
+                                  fontSize: 14),
+                            ),
+                            const SizedBox(height: 12),
+                            ...List.generate(opsi.length, (aIndex) {
+                              bool isCorrect = aIndex == jawabanBenar;
+
+                              return Container(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: isCorrect
+                                      ? Colors.green[50]
+                                      : Colors.grey[50],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(
+                                    color: isCorrect
+                                        ? Colors.green.shade300
+                                        : Colors.grey.shade200,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 12,
+                                      backgroundColor: isCorrect
+                                          ? Colors.green[600]
+                                          : Colors.grey[300],
+                                      child: Text(
+                                        String.fromCharCode(65 + aIndex),
+                                        style: const TextStyle(
+                                            fontSize: 10,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        opsi[aIndex],
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: isCorrect
+                                              ? Colors.green[900]
+                                              : textDark,
+                                          fontWeight: isCorrect
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                    if (isCorrect)
+                                      const Icon(Icons.check_circle,
+                                          color: Colors.green, size: 18),
+                                  ],
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
-      // Tombol melayang tambah soal stuy
       floatingActionButton: FloatingActionButton.extended(
         backgroundColor: maroonPrimary,
         foregroundColor: Colors.white,

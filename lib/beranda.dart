@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'pretest_model.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in.dart';
 import 'test_page.dart';
 import 'dosen/modul_page.dart';
+import 'gerbang_ujian_page.dart'; // ✅ Tetap dipertahankan stuy
 
 class BerandaPage extends StatefulWidget {
   final String namaMahasiswa;
@@ -23,22 +25,58 @@ class _BerandaPageState extends State<BerandaPage> {
   final Color maroonLight = const Color(0xFFF3EBE9);
   final Color textDark = const Color(0xFF2C2C2C);
 
-  final PretestModel dataPretest = PretestModel(
-    id: "1",
-    judul: "Pretest Syarat Masuk Lab",
-    waktuMulai: DateTime(2026, 6, 11, 8, 30),
-  );
+  String namaTampil = "";
+  String npmTampil = "";
+  bool isLoading = true;
 
-  bool cekApakahSudahBuka(DateTime waktuJadwal) {
-    DateTime waktuSekarang = DateTime.now();
-    return waktuSekarang.isAfter(waktuJadwal) ||
-        waktuSekarang.isAtSameMomentAs(waktuJadwal);
+  int skorPretest = 0;
+  String statusPretest = "BELUM DIAMBIL";
+  int skorPostest = 0;
+  String statusPostest = "BELUM DIAMBIL";
+
+  @override
+  void initState() {
+    super.initState();
+    namaTampil = widget.namaMahasiswa;
+    npmTampil = widget.npmMahasiswa;
+    _listenDataMahasiswaDanNilai();
+  }
+
+  void _listenDataMahasiswaDanNilai() {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser.uid)
+          .snapshots()
+          .listen((userDoc) {
+        if (userDoc.exists && userDoc.data() != null) {
+          Map<String, dynamic> data = userDoc.data() as Map<String, dynamic>;
+          if (mounted) {
+            setState(() {
+              namaTampil = data['nama'] ?? widget.namaMahasiswa;
+              npmTampil = data['npm'] ?? widget.npmMahasiswa;
+
+              skorPretest = data['nilai_pretest'] ?? 0;
+              statusPretest = data['status_pretest'] ?? "BELUM DIAMBIL";
+              skorPostest = data['nilai_postest'] ?? 0;
+              statusPostest = data['status_postest'] ?? "BELUM DIAMBIL";
+
+              isLoading = false;
+            });
+          }
+        }
+      }, onError: (e) {
+        debugPrint("Gagal mendengarkan data Firestore: $e");
+        if (mounted) setState(() => isLoading = false);
+      });
+    } else {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    bool isPretestBuka = cekApakahSudahBuka(dataPretest.waktuMulai);
-
     return Scaffold(
       backgroundColor: const Color(0xFFF9F6F6),
       appBar: AppBar(
@@ -62,9 +100,10 @@ class _BerandaPageState extends State<BerandaPage> {
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             tooltip: 'Log Out',
-            onPressed: () {
-              Navigator.pushReplacement(
-                context,
+            onPressed: () async {
+              final navigator = Navigator.of(context);
+              await FirebaseAuth.instance.signOut();
+              navigator.pushReplacement(
                 MaterialPageRoute(builder: (context) => const SignInPage()),
               );
             },
@@ -88,34 +127,41 @@ class _BerandaPageState extends State<BerandaPage> {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Halo, Selamat Datang Mahasiswa!',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Halo, Selamat Datang Mahasiswa!',
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                    Text(
-                      widget.namaMahasiswa,
-                      style: TextStyle(
-                        color: textDark,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 18,
+                      isLoading
+                          ? const SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(strokeWidth: 2))
+                          : Text(
+                              namaTampil,
+                              style: TextStyle(
+                                color: textDark,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 18,
+                              ),
+                            ),
+                      Text(
+                        'NPM: $npmTampil',
+                        style: TextStyle(
+                          color: maroonPrimary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    Text(
-                      'NPM: ${widget.npmMahasiswa}',
-                      style: TextStyle(
-                        color: maroonPrimary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -138,9 +184,10 @@ class _BerandaPageState extends State<BerandaPage> {
                     child: Text(
                       '“Siap mengeksplorasi visualisasi anatomi kardiovaskular hari ini?”',
                       style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontStyle: FontStyle.italic),
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
                     ),
                   ),
                 ],
@@ -259,6 +306,8 @@ class _BerandaPageState extends State<BerandaPage> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // 🚨 MODIFIKASI DISINI STUY - KELOMPOK CARD PRETEST 🚨
             _buildCustomCard(
               title: 'PRETEST',
               child: Column(
@@ -276,10 +325,10 @@ class _BerandaPageState extends State<BerandaPage> {
                             color: Colors.white, size: 30),
                       ),
                       const SizedBox(width: 12),
-                      Expanded(
+                      const Expanded(
                         child: Text(
-                          dataPretest.judul,
-                          style: const TextStyle(
+                          "Pretest Syarat Masuk Lab",
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                           ),
@@ -288,24 +337,23 @@ class _BerandaPageState extends State<BerandaPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // ✅ FIX: Tombol selalu aktif (onPressed tidak dilempar null) agar bisa pindah ke GerbangUjianPage yang dinamis
                   _buildElevatedButton(
-                    isPretestBuka ? 'Ambil Pretest' : 'Pretest Belum Dibuka',
-                    onPressed: isPretestBuka
-                        ? () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    const TestPage(testType: 'Pre-Test'),
-                              ),
-                            );
-                          }
-                        : null,
+                    'Ambil Pretest',
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const GerbangUjianPage(isPretest: true),
+                        ),
+                      );
+                    },
                   ),
                   const SizedBox(height: 6),
                   Center(
                     child: Text(
-                      'Batas kelulusan minimal skor: 60',
+                      'Batas kelulusan minimal skor: 70',
                       style: TextStyle(color: Colors.grey[700], fontSize: 12),
                     ),
                   ),
@@ -374,10 +422,16 @@ class _BerandaPageState extends State<BerandaPage> {
                     child: _buildProgressCard(
                       title: 'PRETEST HASIL',
                       subtitle: 'Skor Pretest Terbaik',
-                      status: 'BELUM DIAMBIL',
-                      statusColor: const Color.fromARGB(255, 0, 0, 0),
-                      progressValue: 0.0,
-                      progressText: '-',
+                      status: statusPretest,
+                      statusColor: statusPretest == 'LULUS'
+                          ? Colors.green
+                          : (statusPretest == 'TIDAK LULUS'
+                              ? Colors.red
+                              : textDark),
+                      progressValue: skorPretest / 100,
+                      progressText: statusPretest == 'BELUM DIAMBIL'
+                          ? '-'
+                          : '$skorPretest',
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -385,10 +439,16 @@ class _BerandaPageState extends State<BerandaPage> {
                     child: _buildProgressCard(
                       title: 'POSTEST HASIL',
                       subtitle: 'Skor Postest Terbaik',
-                      status: 'BELUM DIAMBIL',
-                      statusColor: textDark,
-                      progressValue: 0.0,
-                      progressText: '-',
+                      status: statusPostest,
+                      statusColor: statusPostest == 'LULUS'
+                          ? Colors.green
+                          : (statusPostest == 'TIDAK LULUS'
+                              ? Colors.red
+                              : textDark),
+                      progressValue: skorPostest / 100,
+                      progressText: statusPostest == 'BELUM DIAMBIL'
+                          ? '-'
+                          : '$skorPostest',
                     ),
                   ),
                 ],

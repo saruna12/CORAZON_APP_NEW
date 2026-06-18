@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../pretest_repository.dart'; // Hubungkan ke repository biar singkron stuy
 import 'modul_page.dart';
 import 'bank_soal_page.dart';
 import 'hasil_pretest_page.dart';
@@ -11,8 +12,14 @@ class DosenBerandaPage extends StatefulWidget {
 }
 
 class _DosenBerandaPageState extends State<DosenBerandaPage> {
-  bool _isUjianOpen = false;
   final Color maroonPrimary = const Color(0xFF6B1D2F);
+
+  @override
+  void initState() {
+    super.initState();
+    // Mendengarkan perubahan sakelar ujian live dari Firestore secara real-time stuy
+    PretestRepository.listenStatusUjian();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -20,11 +27,11 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
       backgroundColor: const Color(0xFFF9F6F6),
       body: Column(
         children: [
-          // 1. HEADER MEWAH (Mirip Dashboard Mahasiswa)
+          // 1. HEADER UTAMA + LOG OUT
           Container(
             width: double.infinity,
             padding:
-                const EdgeInsets.only(top: 60, left: 24, right: 24, bottom: 30),
+                const EdgeInsets.only(top: 60, left: 24, right: 16, bottom: 32),
             decoration: BoxDecoration(
               color: maroonPrimary,
               borderRadius: const BorderRadius.only(
@@ -32,152 +39,190 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                 bottomRight: Radius.circular(32),
               ),
             ),
-            child: const Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Selamat Datang,',
-                  style: TextStyle(color: Colors.white70, fontSize: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Selamat Datang,',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Tim Laboran CORAZON 👋',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        child: const Text(
+                          'Sistem Kendali & Manajemen Anatomi',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                SizedBox(height: 4),
-                Text(
-                  'Tim Laboran CORAZON 👋',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold),
-                ),
-                SizedBox(height: 6),
-                Text(
-                  'Sistem Kendali & Manajemen Praktikum Anatomi',
-                  style: TextStyle(color: Colors.white60, fontSize: 12),
+                IconButton(
+                  icon: const Icon(Icons.logout_rounded,
+                      color: Colors.white70, size: 24),
+                  tooltip: 'Keluar Aplikasi',
+                  onPressed: () {
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                  },
                 ),
               ],
             ),
           ),
 
+          // AREA KONTEN UTAMA
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 2. LIVE ACCESS CONTROL CARD (Sinyal Utama Ujian)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [
-                        BoxShadow(
-                          // SUDAH DIPERBAIKI: Menggunakan .withValues sesuai standar baru Flutter
-                          color: Colors.black.withValues(alpha: 0.04),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        Row(
-                          children: [
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: _isUjianOpen
-                                    ? Colors.green.shade50
-                                    : Colors.orange.shade50,
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                _isUjianOpen ? Icons.lock_open : Icons.lock,
-                                color:
-                                    _isUjianOpen ? Colors.green : Colors.orange,
-                                size: 24,
-                              ),
+                  // 2. LIVE ACCESS CONTROL CARD (Sinkron Firestore secara otomatis stuy)
+                  ValueListenableBuilder<bool>(
+                    valueListenable: PretestRepository.statusUjianLive,
+                    builder: (context, isUjianOpen, child) {
+                      return Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.04),
+                              blurRadius: 16,
+                              offset: const Offset(0, 4),
                             ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Status Gerbang Pre-Test',
-                                    style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14),
+                          ],
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isUjianOpen
+                                        ? Colors.green.shade50
+                                        : Colors.orange.shade50,
+                                    shape: BoxShape.circle,
                                   ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    _isUjianOpen
-                                        ? 'Akses Terbuka (Mahasiswa bisa ujian)'
-                                        : 'Akses Terkunci (Mahasiswa standby)',
-                                    style: TextStyle(
-                                        color: _isUjianOpen
-                                            ? Colors.green
-                                            : Colors.orange,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500),
+                                  child: Icon(
+                                    isUjianOpen
+                                        ? Icons.lock_open_rounded
+                                        : Icons.lock_rounded,
+                                    color: isUjianOpen
+                                        ? Colors.green
+                                        : Colors.orange,
+                                    size: 24,
                                   ),
-                                ],
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      const Text(
+                                        'Status Gerbang Pre-Test',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 14),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        isUjianOpen
+                                            ? 'Akses Terbuka (Mahasiswa bisa ujian)'
+                                            : 'Akses Terkunci (Mahasiswa standby)',
+                                        style: TextStyle(
+                                            color: isUjianOpen
+                                                ? Colors.green
+                                                : Colors.orange,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+                            SizedBox(
+                              width: double.infinity,
+                              height: 48,
+                              child: ElevatedButton(
+                                style: ElevatedButton.styleFrom(
+                                  // 🟢 FIX LOGIKA WARNA: Kalau lagi buka, kasih warna Merah (Maroon) untuk tombol tutup. Kalau lagi tutup, kasih warna Hijau stuy!
+                                  backgroundColor: isUjianOpen
+                                      ? maroonPrimary
+                                      : Colors.green,
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(14)),
+                                ),
+                                onPressed: () async {
+                                  // Balik status di database Firestore secara real-time stuy
+                                  await PretestRepository.ubahStatusUjian(
+                                      !isUjianOpen);
+                                },
+                                child: Text(
+                                  isUjianOpen
+                                      ? 'TUTUP AKSES UJIAN'
+                                      : 'BUKA AKSES UJIAN SEKARANG',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                      letterSpacing: 0.5),
+                                ),
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        SizedBox(
-                          width: double.infinity,
-                          height: 46,
-                          child: ElevatedButton(
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:
-                                  _isUjianOpen ? Colors.green : maroonPrimary,
-                              foregroundColor: Colors.white,
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _isUjianOpen = !_isUjianOpen;
-                              });
-                            },
-                            child: Text(
-                              _isUjianOpen
-                                  ? 'TUTUP AKSES UJIAN'
-                                  : 'BUKA AKSES UJIAN SEKARANG',
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                      );
+                    },
                   ),
 
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
                   const Text(
-                    'MENU MANAJEMEN LABORATORIUM',
+                    'MENU UTAMA MANAJEMEN',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                         color: Colors.grey,
-                        letterSpacing: 0.8),
+                        letterSpacing: 1.0),
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. GRID MENU MODERN
+                  // 3. GRID MENU (Kelola Modul & Bank Soal)
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     crossAxisSpacing: 16,
                     mainAxisSpacing: 16,
-                    childAspectRatio: 1.1,
+                    childAspectRatio: 1.15,
                     children: [
-                      // Menu 1: Kelola Modul
                       _buildGridMenu(
                         context: context,
                         title: 'Kelola Modul\nPembelajaran',
@@ -186,7 +231,6 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                         iconColor: const Color(0xFF4A90E2),
                         targetPage: const ModulPage(),
                       ),
-                      // Menu 2: Bank Soal
                       _buildGridMenu(
                         context: context,
                         title: 'Manajemen\nBank Soal',
@@ -195,25 +239,19 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                         iconColor: const Color(0xFFF5A623),
                         targetPage: const BankSoalPage(),
                       ),
-                      // Menu 3: Pantau Nilai
-                      _buildGridMenu(
-                        context: context,
-                        title: 'Memantau\nHasil Pretest',
-                        subtitle: 'Rekap skor mhs live',
-                        icon: Icons.analytics_rounded,
-                        iconColor: const Color(0xFF2ECC71),
-                        targetPage: const HasilPretestPage(),
-                      ),
-                      // Menu 4: Log Out / Keluar Sistem
-                      _buildGridMenu(
-                        context: context,
-                        title: 'Keluar\nAplikasi',
-                        subtitle: 'Kembali ke Sign In',
-                        icon: Icons.logout_rounded,
-                        iconColor: const Color(0xFFE74C3C),
-                        targetPage: null,
-                      ),
                     ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 4. HASIL PRETEST (Full Width List)
+                  _buildFullWidthMenu(
+                    context: context,
+                    title: 'Pantau Perkembangan & Hasil Pretest',
+                    subtitle: 'Rekap skor & status kelulusan mahasiswa live',
+                    icon: Icons.analytics_rounded,
+                    iconColor: const Color(0xFF2ECC71),
+                    targetPage: const HasilPretestPage(),
                   ),
                 ],
               ),
@@ -224,24 +262,18 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
     );
   }
 
-  // Helper Widget untuk Bikin Kotak Menu Grid
   Widget _buildGridMenu({
     required BuildContext context,
     required String title,
     required String subtitle,
     required IconData icon,
     required Color iconColor,
-    required Widget? targetPage,
+    required Widget targetPage,
   }) {
     return InkWell(
       onTap: () {
-        if (targetPage != null) {
-          Navigator.push(
-              context, MaterialPageRoute(builder: (context) => targetPage));
-        } else {
-          // Logika Log Out kembali ke Sign In stuy
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => targetPage));
       },
       borderRadius: BorderRadius.circular(20),
       child: Container(
@@ -252,7 +284,6 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
           border: Border.all(color: Colors.grey.shade100, width: 1),
           boxShadow: [
             BoxShadow(
-              // SUDAH DIPERBAIKI: Menggunakan .withValues standar baru
               color: Colors.black.withValues(alpha: 0.02),
               blurRadius: 10,
               offset: const Offset(0, 4),
@@ -266,7 +297,6 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                // SUDAH DIPERBAIKI: Menggunakan .withValues standar baru
                 color: iconColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
@@ -289,6 +319,70 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                 ),
               ],
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFullWidthMenu({
+    required BuildContext context,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color iconColor,
+    required Widget targetPage,
+  }) {
+    return InkWell(
+      onTap: () {
+        Navigator.push(
+            context, MaterialPageRoute(builder: (context) => targetPage));
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.grey.shade100, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.02),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: iconColor.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(icon, color: iconColor, size: 26),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(color: Colors.grey, fontSize: 11),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.arrow_forward_ios_rounded,
+                color: Colors.grey, size: 14),
           ],
         ),
       ),

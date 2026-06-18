@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "413923570150",
+    "project_id": "corazon-9a8c7",
+    "storage_bucket": "corazon-9a8c7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:413923570150:android:db1be88c3ca475e9d06627",
+        "android_client_info": {
+          "package_name": "com.example.corazon_clean"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAHBEjOlLQGwcaa6kiQP86pFe3bvuWAfvs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

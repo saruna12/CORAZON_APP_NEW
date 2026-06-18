@@ -11,6 +11,13 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.6
   uuid: ^4.5.3
+  firebase_core: ^4.11.0
+  cloud_firestore: ^6.6.0
+  firebase_auth: ^6.5.3
+  
+  # Tambahan library untuk import Excel (Web Admin) stuy
+  file_picker: ^8.1.7
+  excel: ^4.0.0
 
 dev_dependencies:
   flutter_test:
@@ -20,6 +27,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Ini baris paling penting untuk mendaftarkan gambar logo kamu
+  # Pendaftaran folder assets gambar kamu stuy
   assets:
     - assets/images/

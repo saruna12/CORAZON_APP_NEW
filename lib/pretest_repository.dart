@@ -1,205 +1,94 @@
-import 'dart:collection';
-import 'package:flutter/material.dart'; // PASTIKAN IMPORT INI ADA STUY!
+import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
-// ================= MODEL SOAL & UJIAN =================
-class Question {
-  final String id;
-  final String text;
-  final List<String> options;
-  final int answerIndex;
-
-  Question({
-    required this.id,
-    required this.text,
-    required this.options,
-    required this.answerIndex,
-  });
-}
-
-class PretestItem {
-  final String id;
-  String title;
-  DateTime scheduledAt;
-  final List<Question> questions;
-  final List<PretestResult> results;
-  bool isOpenedByDosen;
-
-  PretestItem({
-    required this.id,
-    required this.title,
-    required this.scheduledAt,
-    List<Question>? questions,
-    List<PretestResult>? results,
-    this.isOpenedByDosen = false,
-  })  : questions = questions ?? [],
-        results = results ?? [];
-}
-
-class PretestResult {
-  final String studentId;
-  final String studentName;
-  final int score;
-  final DateTime takenAt;
-  final Map<String, dynamic> answers;
-
-  PretestResult({
-    required this.studentId,
-    required this.studentName,
-    required this.score,
-    required this.takenAt,
-    required this.answers,
-  });
-}
-
-// ================= MODEL MODUL BARU (DIKTIK SESUAI ALUR KITA) =================
-class ModulItem {
-  final String id;
-  final String title;
-  final String fileUrl;
-  final DateTime createdAt;
-
-  ModulItem({
-    required this.id,
-    required this.title,
-    required this.fileUrl,
-    required this.createdAt,
-  });
-}
-
-// ================= REPOSITORY UTAMA =================
 class PretestRepository {
-  PretestRepository._internal();
-  static final PretestRepository _instance = PretestRepository._internal();
-  factory PretestRepository() => _instance;
-
-  final List<PretestItem> _pretests = [];
-
-  // 1. Penampung list modul (diisi 1 data contoh bawaan buat anatomi jantung)
-  final List<ModulItem> _moduls = [
-    ModulItem(
-      id: 'm1',
-      title: 'Modul 1: Anatomi Jantung & Kardiovaskular',
-      fileUrl: 'https://drive.google.com/file/d/contoh-link-pdf/view',
-      createdAt: DateTime.now(),
-    ),
-  ];
-
-  // ================= DEKLARASI WAJIB (INI YANG DICARI TEST_PAGE) =================
   static final ValueNotifier<bool> statusUjianLive = ValueNotifier<bool>(false);
 
-  UnmodifiableListView<PretestItem> get pretests =>
-      UnmodifiableListView(_pretests);
-
-  // ================= UTAL-ATIL DATA MODUL (BARU) =================
-
-  // Getter agar halaman dosen & mahasiswa bisa membaca list modul stuy
-  List<ModulItem> get moduls => _moduls;
-
-  // Fungsi untuk menambahkan modul baru lewat pop-up dosen nanti
-  void addModul(String title, String url) {
-    _moduls.add(
-      ModulItem(
-        id: DateTime.now()
-            .millisecondsSinceEpoch
-            .toString(), // ID unik berbasis waktu
-        title: title,
-        fileUrl: url,
-        createdAt: DateTime.now(),
-      ),
-    );
+  // Mendengarkan status ujian live secara real-time stream
+  static void listenStatusUjian() {
+    FirebaseFirestore.instance
+        .collection('pengaturan')
+        .doc('pretest')
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        // Mengambil data field 'is_live'
+        bool statusDariServer = snapshot.data()?['is_live'] ?? false;
+        statusUjianLive.value = statusDariServer;
+        debugPrint("📡 STATUS UJIAN LIVE BERUBAH: $statusDariServer");
+      }
+    }, onError: (error) {
+      debugPrint("❌ GAGAL MENDENGARKAN STATUS UJIAN: $error");
+    });
   }
 
-  // Fungsi untuk menghapus modul jika dosen salah input
-  void deleteModul(String id) {
-    _moduls.removeWhere((m) => m.id == id);
+  // Mengubah status ujian (Dipakai oleh tombol Admin stuy)
+  static Future<void> ubahStatusUjian(bool statusBaru) async {
+    await FirebaseFirestore.instance
+        .collection('pengaturan')
+        .doc('pretest')
+        .set({'is_live': statusBaru}, SetOptions(merge: true));
   }
 
-  // ================= FUNGSI BAWAAN ASLI (TIDAK BERUBAH) =================
-
-  // Fungsi untuk mengubah status ujian secara global
-  void setStatusUjian(String pretestId, bool status) {
-    statusUjianLive.value = status; // Mengubah pemicu sinyal live
-    final p = getPretestById(pretestId);
-    if (p != null) {
-      p.isOpenedByDosen = status;
-    }
+  // Fungsi untuk Hasil Pretest Page
+  static Stream<QuerySnapshot> getActivePretest() {
+    return FirebaseFirestore.instance
+        .collection('users')
+        .where('role', isEqualTo: 'mahasiswa')
+        .snapshots();
   }
 
-  void addPretest(PretestItem item) {
-    _pretests.add(item);
+  // ==========================================
+  // MANAJEMEN MODUL
+  // ==========================================
+
+  // Mengambil data modul terupdate secara real-time
+  static Stream<QuerySnapshot> get moduls {
+    return FirebaseFirestore.instance
+        .collection('modul')
+        .orderBy('timestamp', descending: true)
+        .snapshots();
   }
 
-  void updatePretest(String id, {String? title, DateTime? scheduledAt}) {
-    final idx = _pretests.indexWhere((p) => p.id == id);
-    if (idx >= 0) {
-      final p = _pretests[idx];
-      if (title != null) p.title = title;
-      if (scheduledAt != null) p.scheduledAt = scheduledAt;
-    }
+  // Menambah modul baru ke Firestore
+  static Future<void> addModul(
+      String judul, String deskripsi, String urlPdf) async {
+    await FirebaseFirestore.instance.collection('modul').add({
+      'judul': judul,
+      'deskripsi': deskripsi,
+      'url_pdf': urlPdf,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 
-  void deletePretest(String id) {
-    _pretests.removeWhere((p) => p.id == id);
+  // Menghapus modul dari Firestore berdasarkan ID dokumen
+  static Future<void> deleteModul(String docId) async {
+    await FirebaseFirestore.instance.collection('modul').doc(docId).delete();
   }
 
-  PretestItem? getPretestById(String id) {
-    try {
-      return _pretests.firstWhere((p) => p.id == id);
-    } catch (_) {
-      return null;
-    }
+  // ==========================================
+  // FITUR KUIS MAHASISWA (FITUR BARU)
+  // ==========================================
+
+  // Mengambil semua soal pretest untuk dikerjakan mahasiswa
+  static Future<List<QueryDocumentSnapshot>> ambilSemuaSoal() async {
+    QuerySnapshot snapshot = await FirebaseFirestore.instance
+        .collection('soal_pretest')
+        .orderBy('timestamp', descending: true)
+        .get();
+    return snapshot.docs;
   }
 
-  void addQuestion(String pretestId, Question q) {
-    final p = getPretestById(pretestId);
-    if (p != null) p.questions.add(q);
-  }
-
-  List<Question> getQuestions(String pretestId) {
-    final p = getPretestById(pretestId);
-    return p?.questions ?? [];
-  }
-
-  void updateQuestion(String pretestId, String questionId,
-      {String? text, List<String>? options, int? answerIndex}) {
-    final p = getPretestById(pretestId);
-    if (p == null) return;
-    final idx = p.questions.indexWhere((q) => q.id == questionId);
-    if (idx < 0) return;
-    final old = p.questions[idx];
-    final updated = Question(
-      id: old.id,
-      text: text ?? old.text,
-      options: options ?? old.options,
-      answerIndex: answerIndex ?? old.answerIndex,
-    );
-    p.questions[idx] = updated;
-  }
-
-  void deleteQuestion(String pretestId, String questionId) {
-    final p = getPretestById(pretestId);
-    if (p == null) return;
-    p.questions.removeWhere((q) => q.id == questionId);
-  }
-
-  void saveResult(String pretestId, PretestResult result) {
-    final p = getPretestById(pretestId);
-    if (p != null) p.results.add(result);
-  }
-
-  List<PretestResult> getResults(String pretestId) {
-    final p = getPretestById(pretestId);
-    return p?.results ?? [];
-  }
-
-  PretestItem? getActivePretest() {
-    if (_pretests.isEmpty) return null;
-    final now = DateTime.now();
-    final future = _pretests.where((p) => p.scheduledAt.isAfter(now)).toList();
-    if (future.isNotEmpty) {
-      future.sort((a, b) => a.scheduledAt.compareTo(b.scheduledAt));
-      return future.first;
-    }
-    return _pretests.last;
+  // Menyimpan hasil pretest mahasiswa ke dokumen user-nya masing-masing
+  static Future<void> simpanHasilPretest({
+    required String userId,
+    required int nilai,
+    required String status,
+  }) async {
+    await FirebaseFirestore.instance.collection('users').doc(userId).update({
+      'nilai_pretest': nilai,
+      'status_pretest': status,
+      'waktu_selesai_pretest': FieldValue.serverTimestamp(),
+    });
   }
 }
