@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in.dart';
-import 'test_page.dart';
 import 'dosen/modul_page.dart';
 import 'gerbang_ujian_page.dart'; // ✅ Tetap dipertahankan stuy
+import 'gerbang_posttest_page.dart'; // ✅ Tambahan untuk Gerbang Posttest
 
 class BerandaPage extends StatefulWidget {
   final String namaMahasiswa;
@@ -182,7 +182,7 @@ class _BerandaPageState extends State<BerandaPage> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '“Siap mengeksplorasi visualisasi anatomi kardiovaskular hari ini?”',
+                      '"Siap mengeksplorasi visualisasi anatomi kardiovaskular hari ini?"',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -391,13 +391,14 @@ class _BerandaPageState extends State<BerandaPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  // ✅ MODIFIKASI: Tombol Ambil Postest diarahkan ke GerbangPosttestPage
                   _buildElevatedButton(
                     'Ambil Postest',
                     onPressed: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => const TestPage(testType: 'Post-Test'),
+                          builder: (_) => const GerbangPosttestPage(),
                         ),
                       );
                     },

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../pretest_repository.dart'; // Jalur disesuaikan agar pas ke repository stuy
+import '../pretest_repository.dart'; // Jalur ke repository stuy
 import 'modul_page.dart';
 import 'bank_soal_page.dart';
 import 'hasil_pretest_page.dart';
+import '../import_soal_posttest_page.dart'; // ✅ FIX: Jalur mundur 1 folder sesuai struktur filemu stuy!
 
 class DosenBerandaPage extends StatefulWidget {
   const DosenBerandaPage({super.key});
@@ -145,7 +146,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                                         CrossAxisAlignment.start,
                                     children: [
                                       const Text(
-                                        'Status Gerbang Pre-Test',
+                                        'Status Gerbang Ujian (Pre/Post)',
                                         style: TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 14),
@@ -214,7 +215,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // 3. GRID MENU (Kelola Modul & Bank Soal)
+                  // 3. GRID MENU
                   GridView.count(
                     crossAxisCount: 2,
                     shrinkWrap: true,
@@ -233,11 +234,19 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                       ),
                       _buildGridMenu(
                         context: context,
-                        title: 'Manajemen\nBank Soal',
+                        title: 'Manajemen\nBank Soal Pretest',
                         subtitle: 'Atur butir pretest',
                         icon: Icons.quiz_rounded,
                         iconColor: const Color(0xFFF5A623),
                         targetPage: const BankSoalPage(),
+                      ),
+                      _buildGridMenu(
+                        context: context,
+                        title: 'Import Massal\nSoal Posttest',
+                        subtitle: 'Upload Excel Posttest',
+                        icon: Icons.assignment_turned_in_rounded,
+                        iconColor: const Color(0xFF9B59B6),
+                        targetPage: const ImportSoalPosttestPage(),
                       ),
                     ],
                   ),

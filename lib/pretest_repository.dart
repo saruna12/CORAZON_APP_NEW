@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PretestRepository {
-  // 📡 Pemantau Status Live Ujian (Bisa dibaca langsung oleh Dosen & Mahasiswa)
+  // 📡 Pemantau Status Live Ujian
   static final ValueNotifier<bool> statusUjianLive = ValueNotifier<bool>(false);
 
   // 1. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian di Firestore
@@ -36,32 +36,46 @@ class PretestRepository {
     });
   }
 
-  // 3. Fungsi untuk Mahasiswa: Mengirim Nilai Hasil Ujian ke Database Baru
+  // 3. ✅ FIX: Simpan nilai ke users/{uid} agar beranda bisa baca langsung
   static Future<void> simpanHasilPretest({
     required String userId,
     required int nilai,
     required String status,
   }) async {
     try {
-      // Menyimpan rekap nilai ke collection 'nilai_pretest' dengan Document ID berupa ID Mahasiswa
-      await FirebaseFirestore.instance
-          .collection('nilai_pretest')
-          .doc(userId)
-          .set({
-        'user_id': userId,
-        'nilai': nilai,
-        'status': status,
-        'waktu_selesai': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      // ✅ Simpan ke users/{uid} — sesuai yang dibaca beranda.dart
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'nilai_pretest': nilai,
+        'status_pretest': status,
+        'waktu_pretest': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true)); // merge: true agar data lain tidak tertimpa
 
-      debugPrint("Nilai mahasiswa $userId berhasil direkam stuy!");
+      debugPrint("Nilai pretest mahasiswa $userId berhasil direkam!");
     } catch (e) {
       debugPrint("Gagal menyimpan nilai pretest ke database: $e");
     }
   }
 
-  // 📥 4. FUNGSI BARU: Import Excel Massal ke Firebase dengan Aman (Null-Safety)
-  // Masukkan parameter list data dari sheet Excel ke sini stuy!
+  // 4. ✅ Simpan nilai postest ke users/{uid}
+  static Future<void> simpanHasilPosttest({
+    required String userId,
+    required int nilai,
+    required String status,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'nilai_postest': nilai,
+        'status_postest': status,
+        'waktu_postest': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      debugPrint("Nilai postest mahasiswa $userId berhasil direkam!");
+    } catch (e) {
+      debugPrint("Gagal menyimpan nilai postest ke database: $e");
+    }
+  }
+
+  // 5. Fungsi Import Excel Massal ke Firebase
   static Future<void> importMassalBankSoal(List<List<dynamic>> rows) async {
     try {
       final collectionRef = FirebaseFirestore.instance
@@ -70,20 +84,16 @@ class PretestRepository {
           .collection('daftar_soal');
 
       for (var row in rows) {
-        // A. Abaikan baris header (misal baris pertama yang berisi teks "No" atau "Pertanyaan")
         if (row.isEmpty || row[0].toString().toLowerCase().contains('no')) {
           continue;
         }
 
-        // B. Cegah "Unexpected null value" akibat baris kosong di bawah data Excel
-        // Jika kolom Pertanyaan (indeks 1) null atau kosong, lewati baris ini stuy!
         if (row.length < 2 ||
             row[1] == null ||
             row[1].toString().trim().isEmpty) {
           continue;
         }
 
-        // C. Ekstrak data sel dengan aman (menggunakan null-coalescing '??')
         String pertanyaan = row[1].toString().trim();
         String opsiA =
             row.length > 2 && row[2] != null ? row[2].toString().trim() : '';
@@ -94,12 +104,10 @@ class PretestRepository {
         String opsiD =
             row.length > 5 && row[5] != null ? row[5].toString().trim() : '';
 
-        // Baca kunci huruf (A/B/C/D)
         String kunciHuruf = row.length > 6 && row[6] != null
             ? row[6].toString().trim().toUpperCase()
             : 'A';
 
-        // D. Konversi Kunci Jawaban Huruf (Excel) -> Angka 0-3 (Untuk Kuis UI)
         int kunciAngka = 0;
         switch (kunciHuruf) {
           case 'A':
@@ -115,20 +123,18 @@ class PretestRepository {
             kunciAngka = 3;
             break;
           default:
-            kunciAngka = 0; // Fallback default ke A stuy jika tidak valid
+            kunciAngka = 0;
         }
 
-        // E. Unggah data ke Cloud Firestore
         await collectionRef.add({
           'pertanyaan': pertanyaan,
           'opsi': [opsiA, opsiB, opsiC, opsiD],
-          'jawaban_benar': kunciAngka, // Disimpan dalam bentuk int stuy!
+          'jawaban_benar': kunciAngka,
           'created_at': FieldValue.serverTimestamp(),
         });
       }
-      debugPrint("Semua soal berhasil di-import massal ke Firebase stuy!");
+      debugPrint("Semua soal berhasil di-import massal ke Firebase!");
     } catch (e) {
-      // Melempar error kembali agar bisa ditangkap oleh UI ("Gagal memproses import: ...")
       throw Exception(e.toString());
     }
   }
