@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel_pkg;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 
 class ImportSoalPage extends StatefulWidget {
   const ImportSoalPage({super.key});
@@ -39,6 +40,31 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
     return cell.value.toString().trim();
   }
 
+  // 🔥 FUNGSI BARU: Upload file Excel ke Firebase Storage stuy!
+  Future<String> _uploadFileKeFirebaseStorage(PlatformFile file) async {
+    try {
+      final fileName = '${DateTime.now().millisecondsSinceEpoch}_${file.name}';
+      final ref = FirebaseStorage.instance
+          .ref()
+          .child('bank_soal')
+          .child('excel_files')
+          .child(fileName);
+
+      if (kIsWeb) {
+        await ref.putBytes(file.bytes!);
+      } else {
+        await ref.putFile(File(file.path!));
+      }
+
+      String downloadURL = await ref.getDownloadURL();
+      print('✅ File berhasil diupload: $downloadURL');
+      return downloadURL;
+    } catch (e) {
+      print('❌ Gagal upload ke Storage: $e');
+      throw Exception('Gagal upload file: $e');
+    }
+  }
+
   // 1. Fungsi memilih file Excel (.xlsx) stuy
   Future<void> _pilihFileExcel() async {
     try {
@@ -70,6 +96,18 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
     });
 
     try {
+      // 🔥 STEP 1: Upload file ke Firebase Storage terlebih dahulu
+      String fileStorageURL = '';
+      try {
+        setState(() {
+          _statusPesan = "📤 Uploading file Excel ke Firebase Storage...";
+        });
+        fileStorageURL = await _uploadFileKeFirebaseStorage(_fileTerpilih!);
+      } catch (e) {
+        print('⚠️ Warning: Upload ke Storage gagal, lanjut ke database: $e');
+      }
+
+      // STEP 2: Proses data Excel dan simpan ke Firestore
       List<int> bytes;
 
       if (kIsWeb) {
@@ -159,6 +197,8 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
           'opsi': daftarOpsi,
           'jawaban_benar': jawabanBenarIndeks,
           'created_at': FieldValue.serverTimestamp(),
+          'file_storage_url': fileStorageURL,  // 🔥 TAMBAHAN: Simpan URL file
+          'file_name': _fileTerpilih!.name,     // 🔥 TAMBAHAN: Simpan nama file
         });
 
         jumlahSoalBerhasil++;
@@ -169,8 +209,10 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
         setState(() {
           _isUploading = false;
           _fileTerpilih = null;
-          _statusPesan =
-              "🔥 BERHASIL! $jumlahSoalBerhasil soal anatomi sukses masuk database stuy!";
+          String pesan = fileStorageURL.isNotEmpty
+              ? "🔥 BERHASIL! $jumlahSoalBerhasil soal + File Excel berhasil di-upload stuy!"
+              : "🔥 BERHASIL! $jumlahSoalBerhasil soal disimpan (File upload skipped)";
+          _statusPesan = pesan;
         });
       } else {
         setState(() {
