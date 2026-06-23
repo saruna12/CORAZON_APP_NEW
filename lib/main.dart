@@ -1,22 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart'; // ✅ Untuk kIsWeb
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splash_screen.dart';
-import 'pretest_repository.dart'; // 🔴 WAJIB IMPORT REPOSITORY KAMU DI SINI STUY!
+import 'pretest_repository.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(
-    options: const FirebaseOptions(
-      apiKey: 'AIzaSyAHBEjOlLQGwcaa6kiQP86pFe3bvuWAfvs',
-      appId: '1:413923570150:android:db1be88c3ca475e9d06627',
-      messagingSenderId: '413923570150',
-      projectId: 'corazon-9a8c7',
-    ),
-  );
+  // ✅ FIX: Pisahkan config Firebase untuk Web dan Android
+  if (kIsWeb) {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'AIzaSyAHBEjOlLQGwcaa6kiQP86pFe3bvuWAfvs',
+        appId:
+            '1:413923570150:web:XXXXXXXXXXXXXXXX', // ← Ganti dengan Web App ID kamu
+        messagingSenderId: '413923570150',
+        projectId: 'corazon-9a8c7',
+        authDomain: 'corazon-9a8c7.firebaseapp.com',
+        storageBucket: 'corazon-9a8c7.appspot.com',
+      ),
+    );
+  } else {
+    await Firebase.initializeApp(
+      options: const FirebaseOptions(
+        apiKey: 'AIzaSyAHBEjOlLQGwcaa6kiQP86pFe3bvuWAfvs',
+        appId: '1:413923570150:android:db1be88c3ca475e9d06627',
+        messagingSenderId: '413923570150',
+        projectId: 'corazon-9a8c7',
+      ),
+    );
+  }
 
-  // 🟢 KUNCI UTAMA: Aktifkan pendengar status ujian sejak aplikasi dibuka stuy!
+  // Aktifkan pendengar status ujian sejak aplikasi dibuka
   PretestRepository.listenStatusUjian();
 
   runApp(const MyApp());

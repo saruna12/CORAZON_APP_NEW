@@ -19,38 +19,46 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
   bool _isUploading = false;
   String _statusPesan = "";
 
-  // Mengubah inputan kunci dari Excel secara aman stuy
+  // Mengubah inputan kunci dari Excel (bisa Huruf A-D atau Angka 0-3) secara aman
   int _konversiKunciKeIndeks(dynamic value) {
     if (value == null) return 0;
 
     String nilaiString = value.toString().trim().toUpperCase();
 
-    if (nilaiString == '0' || nilaiString == 'A') return 0;
-    if (nilaiString == '1' || nilaiString == 'B') return 1;
-    if (nilaiString == '2' || nilaiString == 'C') return 2;
-    if (nilaiString == '3' || nilaiString == 'D') return 3;
+    // Jika di excel diisi angka murni (0, 1, 2, 3)
+    if (nilaiString == '0') return 0;
+    if (nilaiString == '1') return 1;
+    if (nilaiString == '2') return 2;
+    if (nilaiString == '3') return 3;
 
-    return 0; // Default aman ke opsi A stuy
+    // Jika di excel diisi huruf teks (A, B, C, D)
+    switch (nilaiString) {
+      case 'A':
+        return 0;
+      case 'B':
+        return 1;
+      case 'C':
+        return 2;
+      case 'D':
+        return 3;
+      default:
+        return 0;
+    }
   }
 
-  // Pembasmi utama eror Unexpected null value stuy!
-  String _ambilTeksCell(dynamic cell) {
-    if (cell == null || cell.value == null) return "";
-    return cell.value.toString().trim();
-  }
-
-  // 1. Fungsi memilih file Excel (.xlsx) stuy
+  // 1. Fungsi memilih file Excel (.xlsx)
   Future<void> _pilihFileExcel() async {
     try {
       FilePickerResult? result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['xlsx'],
+        withData: true, // ✅ FIX UTAMA: Wajib agar bytes terisi di Flutter Web
       );
 
       if (result != null) {
         setState(() {
           _fileTerpilih = result.files.first;
-          _statusPesan = "File siap diimport stuy!";
+          _statusPesan = "File siap diimport!";
         });
       }
     } catch (e) {
@@ -60,7 +68,7 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
     }
   }
 
-  // 2. Fungsi membaca file Excel dengan validasi berlapis stuy
+  // 2. Fungsi membaca file Excel dengan validasi null-safe
   Future<void> _prosesImportExcel() async {
     if (_fileTerpilih == null) return;
 
@@ -72,9 +80,25 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
     try {
       List<int> bytes;
 
+      // ✅ FIX: Null guard untuk web dan mobile/desktop
       if (kIsWeb) {
+        if (_fileTerpilih!.bytes == null) {
+          setState(() {
+            _isUploading = false;
+            _statusPesan =
+                "❌ Gagal: Data file tidak terbaca. Coba pilih file ulang.";
+          });
+          return;
+        }
         bytes = _fileTerpilih!.bytes!;
       } else {
+        if (_fileTerpilih!.path == null) {
+          setState(() {
+            _isUploading = false;
+            _statusPesan = "❌ Gagal: Path file tidak ditemukan.";
+          });
+          return;
+        }
         bytes = File(_fileTerpilih!.path!).readAsBytesSync();
       }
 
@@ -83,7 +107,7 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
       var table = excel.tables[sheetName];
 
       if (table == null || table.maxRows <= 1) {
-        throw "File Excel kosong atau format tidak sesuai stuy.";
+        throw "File Excel kosong atau format tidak sesuai.";
       }
 
       int jumlahSoalBerhasil = 0;
@@ -93,67 +117,43 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
           .doc('paket_utama_pretest')
           .collection('daftar_soal');
 
-      // Loop lembar baris secara aman stuy
-      for (var row in table.rows) {
-        // FILTER 1: Jika baris data null atau kosong, langsung lewati stuy!
-        if (row.isEmpty) continue;
+      // Iterasi baris Excel
+      for (int i = 0; i < table.maxRows; i++) {
+        var row = table.rows[i];
 
-        // FILTER 2: Ekstrak teks cell dengan validasi kepastian panjang index row
-        String col0 =
-            row.isNotEmpty && row[0] != null ? _ambilTeksCell(row[0]) : "";
-        String col1 =
-            row.length > 1 && row[1] != null ? _ambilTeksCell(row[1]) : "";
-        String col2 =
-            row.length > 2 && row[2] != null ? _ambilTeksCell(row[2]) : "";
-        String col3 =
-            row.length > 3 && row[3] != null ? _ambilTeksCell(row[3]) : "";
-        String col4 =
-            row.length > 4 && row[4] != null ? _ambilTeksCell(row[4]) : "";
-        String col5 =
-            row.length > 5 && row[5] != null ? _ambilTeksCell(row[5]) : "";
-        String col6 =
-            row.length > 6 && row[6] != null ? _ambilTeksCell(row[6]) : "";
+        // Proteksi 1: Lewati baris yang tidak punya data kolom yang cukup
+        if (row.length < 7) continue;
 
-        String soalStr = "";
-        String opsiA = "";
-        String opsiB = "";
-        String opsiC = "";
-        String opsiD = "";
-        String kunciRaw = "";
+        // Ambil value mentah dari objek CellValue secara aman
+        var cellNo = row[0]?.value;
+        var cellSoal = row[1]?.value;
+        var cellA = row[2]?.value;
+        var cellB = row[3]?.value;
+        var cellC = row[4]?.value;
+        var cellD = row[5]?.value;
+        var cellKunci = row[6]?.value;
 
-        // DETEKSI LAYOUT: Otomatis mendeteksi Excel yang pakai kolom No atau yang langsung Pertanyaan
-        if (col0.toLowerCase() == "no" || double.tryParse(col0) != null) {
-          soalStr = col1;
-          opsiA = col2;
-          opsiB = col3;
-          opsiC = col4;
-          opsiD = col5;
-          kunciRaw = col6;
-        } else {
-          soalStr = col0;
-          opsiA = col1;
-          opsiB = col2;
-          opsiC = col3;
-          opsiD = col4;
-          kunciRaw = col5;
-        }
+        // Proteksi 2: Lewati baris Header atau baris kosong
+        String nomorStr = cellNo?.toString().trim() ?? "";
+        String soalStr = cellSoal?.toString().trim() ?? "";
 
-        // FILTER 3: Jalur bypass baris header template atau baris hantu kosong di excel
-        if (soalStr.trim().isEmpty ||
-            soalStr.toLowerCase().contains("pertanyaan") ||
-            soalStr.toLowerCase().contains("soal")) {
+        if (nomorStr.toLowerCase().contains("no") ||
+            soalStr.toLowerCase().contains("panduan") ||
+            soalStr.isEmpty) {
           continue;
         }
 
-        // FILTER 4: Jika opsi jawaban kosong semua (baris rusak), jangan dimasukkan ke Firebase
-        if (opsiA.isEmpty && opsiB.isEmpty) {
-          continue;
-        }
+        // Ambil data string yang bersih
+        String opsiA = cellA?.toString().trim() ?? "";
+        String opsiB = cellB?.toString().trim() ?? "";
+        String opsiC = cellC?.toString().trim() ?? "";
+        String opsiD = cellD?.toString().trim() ?? "";
 
-        int jawabanBenarIndeks = _konversiKunciKeIndeks(kunciRaw);
+        int jawabanBenarIndeks = _konversiKunciKeIndeks(cellKunci);
         List<String> daftarOpsi = [opsiA, opsiB, opsiC, opsiD];
 
         DocumentReference docRef = collectionTarget.doc();
+
         batch.set(docRef, {
           'pertanyaan': soalStr,
           'opsi': daftarOpsi,
@@ -164,18 +164,19 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
         jumlahSoalBerhasil++;
       }
 
+      // Jalankan pengiriman data massal jika ada data yang lolos screening
       if (jumlahSoalBerhasil > 0) {
         await batch.commit();
         setState(() {
           _isUploading = false;
           _fileTerpilih = null;
           _statusPesan =
-              "🔥 BERHASIL! $jumlahSoalBerhasil soal anatomi sukses masuk database stuy!";
+              "🔥 BERHASIL! $jumlahSoalBerhasil soal anatomi sukses dimasukkan ke database!";
         });
       } else {
         setState(() {
           _isUploading = false;
-          _statusPesan = "❌ Gagal: Tidak ada soal valid yang ter-import stuy.";
+          _statusPesan = "❌ Gagal: Tidak ada baris soal valid yang ditemukan.";
         });
       }
     } catch (e) {
@@ -222,11 +223,13 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Bisa menggunakan kolom No atau langsung Pertanyaan di kolom pertama stuy.",
+                    "Pastikan file .xlsx memiliki urutan kolom berikut:\nKolom 1: No | Kolom 2: Pertanyaan | Kolom 3: Opsi A | Kolom 4: Opsi B | Kolom 5: Opsi C | Kolom 6: Opsi D | Kolom 7: Kunci (A/B/C/D)",
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 24),
+
+                  // Tombol Pilih File
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: maroonPrimary),
@@ -239,6 +242,7 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                             color: maroonPrimary, fontWeight: FontWeight.bold)),
                     onPressed: _isUploading ? null : _pilihFileExcel,
                   ),
+
                   if (_fileTerpilih != null) ...[
                     const SizedBox(height: 16),
                     Text(
@@ -247,6 +251,8 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                           fontWeight: FontWeight.w600, color: Colors.teal),
                     ),
                     const SizedBox(height: 16),
+
+                    // Tombol Eksekusi
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -257,13 +263,14 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                         child: _isUploading
                             ? const CircularProgressIndicator(
                                 color: Colors.white)
-                            : const Text("Mulai Import ke Firebase stuy!",
+                            : const Text("Mulai Import ke Firebase!",
                                 style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold)),
                       ),
                     )
                   ],
+
                   if (_statusPesan.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     Text(

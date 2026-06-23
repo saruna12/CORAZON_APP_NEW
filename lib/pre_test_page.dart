@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // ✅ TAMBAHAN: Import Firebase Auth
 import 'pretest_repository.dart';
 import 'kuis_pretest_page.dart';
 
@@ -15,14 +16,14 @@ class _PretestPageState extends State<PretestPage> {
   @override
   void initState() {
     super.initState();
-    // Jalankan listener agar status 'is_live' dari Firestore terpantau real-time stuy
+    // Jalankan listener agar status 'is_live' dari Firestore terpantau real-time
     PretestRepository.listenStatusUjian();
   }
 
   @override
   Widget build(BuildContext context) {
-    // SEMENTARA: Ganti dengan ID mahasiswa asli hasil dari proses login autentikasi kamu stuy
-    const String dummyUserId = "mhs_corazon_001";
+    // ✅ FIX: Ambil userId dari Firebase Auth (bukan hardcoded dummy lagi)
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F6F6),
@@ -56,10 +57,61 @@ class _PretestPageState extends State<PretestPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Kuis ini terdiri dari 5 soal acak yang dipilih langsung oleh sistem. Waktu pengerjaan adalah 10 menit stuy.",
+                    "Kuis ini terdiri dari 5 soal acak yang dipilih langsung oleh sistem. Waktu pengerjaan adalah 10 menit.",
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     textAlign: TextAlign.center,
                   ),
+                  const SizedBox(height: 8),
+
+                  // ✅ TAMBAHAN: Tampilkan info user yang sedang login
+                  if (userId.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.person_rounded,
+                              size: 14, color: Colors.grey.shade600),
+                          const SizedBox(width: 6),
+                          Text(
+                            FirebaseAuth.instance.currentUser?.email ?? userId,
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // ✅ TAMBAHAN: Tampilkan warning jika user belum login
+                  if (userId.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.shade50,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.shade200),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_rounded,
+                              color: Colors.red.shade700),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text(
+                              "Kamu belum login. Silakan login terlebih dahulu untuk mengikuti pretest.",
+                              style: TextStyle(
+                                  fontSize: 13, fontWeight: FontWeight.w500),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   const SizedBox(height: 24),
 
                   // 📡 Memantau status LIVE ujian secara real-time dari repository
@@ -81,7 +133,7 @@ class _PretestPageState extends State<PretestPage> {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(
-                                  "Ujian belum dibuka oleh Dosen. Silakan tunggu info selanjutnya stuy.",
+                                  "Ujian belum dibuka oleh Dosen. Silakan tunggu info selanjutnya.",
                                   style: TextStyle(
                                       color: Colors.amber.shade900,
                                       fontSize: 13,
@@ -93,12 +145,14 @@ class _PretestPageState extends State<PretestPage> {
                         );
                       }
 
+                      // ✅ FIX: Tombol hanya aktif jika userId tidak kosong
                       return SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: maroonPrimary,
+                            backgroundColor:
+                                userId.isEmpty ? Colors.grey : maroonPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -112,16 +166,17 @@ class _PretestPageState extends State<PretestPage> {
                                 fontWeight: FontWeight.bold,
                                 fontSize: 16),
                           ),
-                          onPressed: () {
-                            // Pindah ke halaman pengerjaan kuis stuy!
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) =>
-                                    const KuisPretestPage(userId: dummyUserId),
-                              ),
-                            );
-                          },
+                          onPressed: userId.isEmpty
+                              ? null // Disable tombol kalau belum login
+                              : () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) =>
+                                          KuisPretestPage(userId: userId),
+                                    ),
+                                  );
+                                },
                         ),
                       );
                     },

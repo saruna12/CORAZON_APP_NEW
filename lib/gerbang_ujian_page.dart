@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../pretest_repository.dart'; // Sesuaikan path repositorimu stuy
-// ⚠️ SILAKAN GANTI IMPORT DI BAWAH INI DENGAN FILE HALAMAN SOAL/KUIS ASLIMU STUY!
-// Contoh: import 'kuis_pretest_page.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../pretest_repository.dart';
+import 'kuis_pretest_page.dart'; // ✅ FIX: Import halaman kuis yang asli
 
 class GerbangUjianPage extends StatefulWidget {
   final bool isPretest; // true untuk Pretest, false untuk Posttest
@@ -18,7 +18,6 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
   @override
   void initState() {
     super.initState();
-    // 🟢 KUNCI UTAMA: Nyalakan pendengar aliran data Firestore di sisi mahasiswa stuy!
     PretestRepository.listenStatusUjian();
   }
 
@@ -71,7 +70,7 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Mohon tunggu ya stuy! Dosen atau laboran belum mengaktifkan sesi ujian ini. Harap standby di ruangan Lab.',
+              'Mohon tunggu! Dosen atau laboran belum mengaktifkan sesi ujian ini. Harap standby di ruangan Lab.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 13, color: Colors.grey, height: 1.4),
             ),
@@ -81,8 +80,11 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
     );
   }
 
-  // 🏁 TAMPILAN SEBELUM MULAI (ABA-ABA)
+  // 🏁 TAMPILAN SEBELUM MULAI
   Widget _buildScreenSiapMulai(BuildContext context) {
+    // ✅ FIX: Ambil userId dari Firebase Auth
+    final String userId = FirebaseAuth.instance.currentUser?.uid ?? "";
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24.0),
@@ -114,33 +116,62 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
               const Divider(),
               const SizedBox(height: 12),
               _buildInfoRow(
-                  Icons.timer_rounded, 'Durasi Pengerjaan', '15 Menit'),
+                  Icons.timer_rounded, 'Durasi Pengerjaan', '10 Menit'),
               const SizedBox(height: 8),
               _buildInfoRow(
                   Icons.rule_rounded, 'Batas Kelulusan', 'Minimal Skor 70'),
               const SizedBox(height: 24),
 
-              // TOMBOL ABA-ABA UNTUK MULAI MASUK KE SOAL
+              // ✅ FIX: Warning jika belum login
+              if (userId.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.red.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_rounded, color: Colors.red.shade700),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Kamu belum login. Silakan login terlebih dahulu.',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // TOMBOL MULAI
               SizedBox(
                 width: double.infinity,
                 height: 48,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: maroonPrimary,
+                    backgroundColor:
+                        userId.isEmpty ? Colors.grey : maroonPrimary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  onPressed: () {
-                    // 🟢 HUBUNGKAN KE HALAMAN KUIS ASLI KAMU STUY
-                    // Ganti PlaceholderWidget() dengan KuisPretestPage() yang ada di struktur lib folder kamu
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const PlaceholderWidget()),
-                    );
-                  },
+                  // ✅ FIX: Hubungkan ke KuisPretestPage yang asli
+                  onPressed: userId.isEmpty
+                      ? null
+                      : () {
+                          Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  KuisPretestPage(userId: userId),
+                            ),
+                          );
+                        },
                   child: const Text(
                     'MULAI UJIAN SEKARANG',
                     style: TextStyle(
@@ -168,14 +199,5 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
       ],
     );
-  }
-}
-
-class PlaceholderWidget extends StatelessWidget {
-  const PlaceholderWidget({super.key});
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(
-        body: Center(child: Text('Halaman Kuis Belum Dihubungkan stuy!')));
   }
 }
