@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../pretest_repository.dart'; // Hubungkan ke repository biar singkron stuy
+import '../pretest_repository.dart'; // Jalur disesuaikan agar pas ke repository stuy
 import 'modul_page.dart';
 import 'bank_soal_page.dart';
 import 'hasil_pretest_page.dart';
@@ -83,6 +83,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                       color: Colors.white70, size: 24),
                   tooltip: 'Keluar Aplikasi',
                   onPressed: () {
+                    // Balik ke halaman Sign In paling depan stuy
                     Navigator.of(context).popUntil((route) => route.isFirst);
                   },
                 ),
@@ -181,6 +182,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                                       borderRadius: BorderRadius.circular(14)),
                                 ),
                                 onPressed: () async {
+                                  // Memanggil fungsi repository stuy!
                                   await PretestRepository.ubahStatusUjian(
                                       !isUjianOpen);
                                 },
@@ -227,7 +229,6 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                         subtitle: 'Upload materi PDF',
                         icon: Icons.menu_book_rounded,
                         iconColor: const Color(0xFF4A90E2),
-                        // ✅ PERBAIKAN: Melemparkan isDosen: true agar ModulPage tahu yang masuk adalah Dosen
                         targetPage: const ModulPage(isDosen: true),
                       ),
                       _buildGridMenu(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../pretest_repository.dart'; // Mengarah ke file repository di luar folder dosen
+import '../import_soal_page.dart'; // ⬅️ FIX: Mundur 1 folder untuk membaca file Import Excel stuy!
 
 class BankSoalPage extends StatefulWidget {
   const BankSoalPage({super.key});
@@ -85,8 +86,7 @@ class _BankSoalPageState extends State<BankSoalPage> {
                 }),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<int>(
-                  initialValue:
-                      _jawabanBenarIndex, // SUDAH DIPERBAIKI: menggunakan initialValue
+                  initialValue: _jawabanBenarIndex,
                   decoration: const InputDecoration(
                     labelText: 'Kunci Jawaban Benar',
                     prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
@@ -123,21 +123,26 @@ class _BankSoalPageState extends State<BankSoalPage> {
     );
   }
 
-  // Fungsi simpan data asli ke Firestore
+  // Menyimpan data ke /bank_soal/paket_utama_pretest/daftar_soal
   void _simpanSoalKeFirestore() async {
     if (_formKey.currentState!.validate()) {
-      await FirebaseFirestore.instance.collection('soal_pretest').add({
+      await FirebaseFirestore.instance
+          .collection('bank_soal')
+          .doc('paket_utama_pretest')
+          .collection('daftar_soal')
+          .add({
         'pertanyaan': _pertanyaanController.text.trim(),
         'opsi': _opsiController.map((c) => c.text.trim()).toList(),
         'jawaban_benar': _jawabanBenarIndex,
-        'timestamp': FieldValue.serverTimestamp(),
+        'created_at':
+            FieldValue.serverTimestamp(), // Digunakan untuk urutan orderBy
       });
 
       if (mounted) {
         Navigator.pop(context); // Tutup bottom sheet setelah sukses
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Soal berhasil disimpan ke Firestore!'),
+            content: Text('Soal berhasil disimpan ke Jalur Bank Soal Baru!'),
             backgroundColor: Colors.green,
           ),
         );
@@ -171,6 +176,27 @@ class _BankSoalPageState extends State<BankSoalPage> {
         ),
         backgroundColor: maroonPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
+        // ➕ Menambahkan tombol navigasi Import Excel di pojok kanan atas AppBar stuy
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ImportSoalPage()),
+              );
+            },
+            icon: const Icon(Icons.drive_folder_upload_rounded,
+                color: Colors.white, size: 20),
+            label: const Text(
+              "Import Excel",
+              style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13),
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
@@ -197,9 +223,8 @@ class _BankSoalPageState extends State<BankSoalPage> {
                     style: const TextStyle(fontSize: 12),
                   ),
                   value: isLive,
-                  activeThumbColor:
-                      maroonPrimary, // SUDAH DIPERBAIKI: menggunakan activeThumbColor
-                  activeTrackColor: maroonPrimary.withValues(alpha: 0.3),
+                  activeThumbColor: maroonPrimary,
+                  activeTrackColor: maroonPrimary.withAlpha(76),
                   onChanged: (value) =>
                       PretestRepository.ubahStatusUjian(value),
                 );
@@ -212,7 +237,7 @@ class _BankSoalPageState extends State<BankSoalPage> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                "Daftar Soal di Database:",
+                "Daftar Soal di Database Baru:",
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.grey,
@@ -222,25 +247,33 @@ class _BankSoalPageState extends State<BankSoalPage> {
           ),
           const SizedBox(height: 8),
 
-          // List Soal Real-time dari Firestore menggunakan StreamBuilder
+          // Mengambil list soal secara live dari sub-collection baru stuy
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('soal_pretest')
-                  .orderBy('timestamp', descending: true)
+                  .collection('bank_soal')
+                  .doc('paket_utama_pretest')
+                  .collection('daftar_soal')
+                  .orderBy('created_at', descending: true)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+
+                // Menyaring dokumen agar hanya memproses dokumen soal asli
+                var docs = snapshot.data?.docs.where((doc) {
+                      var data = doc.data() as Map<String, dynamic>;
+                      return data.containsKey('pertanyaan');
+                    }).toList() ??
+                    [];
+
+                if (docs.isEmpty) {
                   return const Center(
                     child: Text(
-                        "Belum ada soal di database. Silakan tambah soal."),
+                        "Belum ada soal di database baru. Silakan tambah soal."),
                   );
                 }
-
-                var docs = snapshot.data!.docs;
 
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -270,9 +303,7 @@ class _BankSoalPageState extends State<BankSoalPage> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 10, vertical: 4),
                                   decoration: BoxDecoration(
-                                    color: maroonPrimary.withValues(
-                                        alpha:
-                                            0.1), // SUDAH DIPERBAIKI: menggunakan withValues
+                                    color: maroonPrimary.withAlpha(25),
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(

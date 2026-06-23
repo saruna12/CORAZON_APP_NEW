@@ -19,7 +19,27 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
   bool _isUploading = false;
   String _statusPesan = "";
 
-  // 1. Fungsi memilih file Excel (.xlsx) dari penyimpanan stuy
+  // Mengubah inputan kunci dari Excel secara aman stuy
+  int _konversiKunciKeIndeks(dynamic value) {
+    if (value == null) return 0;
+
+    String nilaiString = value.toString().trim().toUpperCase();
+
+    if (nilaiString == '0' || nilaiString == 'A') return 0;
+    if (nilaiString == '1' || nilaiString == 'B') return 1;
+    if (nilaiString == '2' || nilaiString == 'C') return 2;
+    if (nilaiString == '3' || nilaiString == 'D') return 3;
+
+    return 0; // Default aman ke opsi A stuy
+  }
+
+  // Pembasmi utama eror Unexpected null value stuy!
+  String _ambilTeksCell(dynamic cell) {
+    if (cell == null || cell.value == null) return "";
+    return cell.value.toString().trim();
+  }
+
+  // 1. Fungsi memilih file Excel (.xlsx) stuy
   Future<void> _pilihFileExcel() async {
     try {
       FilePickerResult? result = await FilePicker.pickFiles(
@@ -35,12 +55,12 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
       }
     } catch (e) {
       setState(() {
-        _statusPesan = "Gagal memilih file: $e";
+        _statusPesan = "❌ Gagal memilih file: $e";
       });
     }
   }
 
-  // 2. Fungsi membaca file Excel dan mengirim datanya ke Cloud Firestore
+  // 2. Fungsi membaca file Excel dengan validasi berlapis stuy
   Future<void> _prosesImportExcel() async {
     if (_fileTerpilih == null) return;
 
@@ -52,7 +72,6 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
     try {
       List<int> bytes;
 
-      // Mengatasi pembacaan file berdasarkan platform (Web / Mobile)
       if (kIsWeb) {
         bytes = _fileTerpilih!.bytes!;
       } else {
@@ -74,44 +93,91 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
           .doc('paket_utama_pretest')
           .collection('daftar_soal');
 
-      // Iterasi baris Excel (Mulai dari indeks 1 untuk melewati judul kolom/header)
-      for (int i = 1; i < table.maxRows; i++) {
-        var row = table.rows[i];
+      // Loop lembar baris secara aman stuy
+      for (var row in table.rows) {
+        // FILTER 1: Jika baris data null atau kosong, langsung lewati stuy!
+        if (row.isEmpty) continue;
 
-        // Memastikan kolom pertanyaan (indeks 1) tidak kosong
-        if (row.length > 1 && row[1]?.value != null) {
-          String soal = row[1]!.value.toString();
-          String opsiA = row[2]?.value?.toString() ?? "";
-          String opsiB = row[3]?.value?.toString() ?? "";
-          String opsiC = row[4]?.value?.toString() ?? "";
-          String opsiD = row[5]?.value?.toString() ?? "";
-          String kunci = row[6]?.value?.toString() ?? "";
+        // FILTER 2: Ekstrak teks cell dengan validasi kepastian panjang index row
+        String col0 =
+            row.isNotEmpty && row[0] != null ? _ambilTeksCell(row[0]) : "";
+        String col1 =
+            row.length > 1 && row[1] != null ? _ambilTeksCell(row[1]) : "";
+        String col2 =
+            row.length > 2 && row[2] != null ? _ambilTeksCell(row[2]) : "";
+        String col3 =
+            row.length > 3 && row[3] != null ? _ambilTeksCell(row[3]) : "";
+        String col4 =
+            row.length > 4 && row[4] != null ? _ambilTeksCell(row[4]) : "";
+        String col5 =
+            row.length > 5 && row[5] != null ? _ambilTeksCell(row[5]) : "";
+        String col6 =
+            row.length > 6 && row[6] != null ? _ambilTeksCell(row[6]) : "";
 
-          DocumentReference docRef = collectionTarget.doc();
+        String soalStr = "";
+        String opsiA = "";
+        String opsiB = "";
+        String opsiC = "";
+        String opsiD = "";
+        String kunciRaw = "";
 
-          batch.set(docRef, {
-            'soal': soal,
-            'opsi_a': opsiA,
-            'opsi_b': opsiB,
-            'opsi_c': opsiC,
-            'opsi_d': opsiD,
-            'kunci': kunci.trim().toUpperCase(),
-            'created_at': FieldValue.serverTimestamp(),
-          });
-
-          jumlahSoalBerhasil++;
+        // DETEKSI LAYOUT: Otomatis mendeteksi Excel yang pakai kolom No atau yang langsung Pertanyaan
+        if (col0.toLowerCase() == "no" || double.tryParse(col0) != null) {
+          soalStr = col1;
+          opsiA = col2;
+          opsiB = col3;
+          opsiC = col4;
+          opsiD = col5;
+          kunciRaw = col6;
+        } else {
+          soalStr = col0;
+          opsiA = col1;
+          opsiB = col2;
+          opsiC = col3;
+          opsiD = col4;
+          kunciRaw = col5;
         }
+
+        // FILTER 3: Jalur bypass baris header template atau baris hantu kosong di excel
+        if (soalStr.trim().isEmpty ||
+            soalStr.toLowerCase().contains("pertanyaan") ||
+            soalStr.toLowerCase().contains("soal")) {
+          continue;
+        }
+
+        // FILTER 4: Jika opsi jawaban kosong semua (baris rusak), jangan dimasukkan ke Firebase
+        if (opsiA.isEmpty && opsiB.isEmpty) {
+          continue;
+        }
+
+        int jawabanBenarIndeks = _konversiKunciKeIndeks(kunciRaw);
+        List<String> daftarOpsi = [opsiA, opsiB, opsiC, opsiD];
+
+        DocumentReference docRef = collectionTarget.doc();
+        batch.set(docRef, {
+          'pertanyaan': soalStr,
+          'opsi': daftarOpsi,
+          'jawaban_benar': jawabanBenarIndeks,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+
+        jumlahSoalBerhasil++;
       }
 
-      // Eksekusi pengiriman data massal ke Firebase sekaligus
-      await batch.commit();
-
-      setState(() {
-        _isUploading = false;
-        _fileTerpilih = null;
-        _statusPesan =
-            "🔥 BERHASIL! $jumlahSoalBerhasil soal anatomi sukses dimasukkan ke database!";
-      });
+      if (jumlahSoalBerhasil > 0) {
+        await batch.commit();
+        setState(() {
+          _isUploading = false;
+          _fileTerpilih = null;
+          _statusPesan =
+              "🔥 BERHASIL! $jumlahSoalBerhasil soal anatomi sukses masuk database stuy!";
+        });
+      } else {
+        setState(() {
+          _isUploading = false;
+          _statusPesan = "❌ Gagal: Tidak ada soal valid yang ter-import stuy.";
+        });
+      }
     } catch (e) {
       setState(() {
         _isUploading = false;
@@ -126,7 +192,10 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
       backgroundColor: const Color(0xFFF9F6F6),
       appBar: AppBar(
         title: const Text("Import Massal Bank Soal",
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+            style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16)),
         backgroundColor: maroonPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
@@ -153,27 +222,23 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Pastikan file .xlsx memiliki urutan kolom berikut:\nKolom 1: No | Kolom 2: Pertanyaan | Kolom 3: Opsi A | Kolom 4: Opsi B | Kolom 5: Opsi C | Kolom 6: Opsi D | Kolom 7: Kunci (A/B/C/D)",
+                    "Bisa menggunakan kolom No atau langsung Pertanyaan di kolom pertama stuy.",
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),
                   const SizedBox(height: 24),
-
-                  // Tombol Pilih File
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       side: BorderSide(color: maroonPrimary),
                       padding: const EdgeInsets.symmetric(
                           horizontal: 20, vertical: 12),
                     ),
-                    // ✅ FIXED: Kata 'const' sudah dihapus karena mengandung variabel dinamis maroonPrimary stuy
                     icon: Icon(Icons.file_upload_rounded, color: maroonPrimary),
                     label: Text("Pilih File Excel (.xlsx)",
                         style: TextStyle(
                             color: maroonPrimary, fontWeight: FontWeight.bold)),
                     onPressed: _isUploading ? null : _pilihFileExcel,
                   ),
-
                   if (_fileTerpilih != null) ...[
                     const SizedBox(height: 16),
                     Text(
@@ -182,8 +247,6 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                           fontWeight: FontWeight.w600, color: Colors.teal),
                     ),
                     const SizedBox(height: 16),
-
-                    // Tombol Upload Eksekusi
                     SizedBox(
                       width: double.infinity,
                       height: 48,
@@ -201,7 +264,6 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                       ),
                     )
                   ],
-
                   if (_statusPesan.isNotEmpty) ...[
                     const SizedBox(height: 20),
                     Text(
@@ -212,7 +274,9 @@ class _ImportSoalPageState extends State<ImportSoalPage> {
                           fontWeight: FontWeight.bold,
                           color: _statusPesan.contains("❌")
                               ? Colors.red
-                              : Colors.grey.shade800),
+                              : _statusPesan.contains("🔥")
+                                  ? Colors.green
+                                  : Colors.grey.shade800),
                     ),
                   ]
                 ],
