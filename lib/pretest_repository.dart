@@ -67,14 +67,16 @@ class PretestRepository {
   }
 
   // ==========================================
-  // FITUR KUIS MAHASISWA (FITUR BARU)
+  // FITUR KUIS MAHASISWA (SINKRON EXCEL STUY)
   // ==========================================
 
-  // Mengambil semua soal pretest untuk dikerjakan mahasiswa
-  static Future<List<QueryDocumentSnapshot>> ambilSemuaSoal() async {
+  // ✅ DIPERBAIKI: Mengubah path collection dan tipe data agar sinkron dengan hasil import Excel
+  static Future<List<DocumentSnapshot>> ambilSemuaSoal() async {
     QuerySnapshot snapshot = await FirebaseFirestore.instance
-        .collection('soal_pretest')
-        .orderBy('timestamp', descending: true)
+        .collection('bank_soal')
+        .doc('paket_utama_pretest')
+        .collection('daftar_soal')
+        .orderBy('created_at', descending: true)
         .get();
     return snapshot.docs;
   }

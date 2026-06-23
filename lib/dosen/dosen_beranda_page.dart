@@ -172,7 +172,6 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                               height: 48,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
-                                  // 🟢 FIX LOGIKA WARNA: Kalau lagi buka, kasih warna Merah (Maroon) untuk tombol tutup. Kalau lagi tutup, kasih warna Hijau stuy!
                                   backgroundColor: isUjianOpen
                                       ? maroonPrimary
                                       : Colors.green,
@@ -182,7 +181,6 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                                       borderRadius: BorderRadius.circular(14)),
                                 ),
                                 onPressed: () async {
-                                  // Balik status di database Firestore secara real-time stuy
                                   await PretestRepository.ubahStatusUjian(
                                       !isUjianOpen);
                                 },
@@ -229,7 +227,8 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                         subtitle: 'Upload materi PDF',
                         icon: Icons.menu_book_rounded,
                         iconColor: const Color(0xFF4A90E2),
-                        targetPage: const ModulPage(),
+                        // ✅ PERBAIKAN: Melemparkan isDosen: true agar ModulPage tahu yang masuk adalah Dosen
+                        targetPage: const ModulPage(isDosen: true),
                       ),
                       _buildGridMenu(
                         context: context,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splash_screen.dart';
+import 'pretest_repository.dart'; // 🔴 WAJIB IMPORT REPOSITORY KAMU DI SINI STUY!
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -14,6 +15,9 @@ void main() async {
       projectId: 'corazon-9a8c7',
     ),
   );
+
+  // 🟢 KUNCI UTAMA: Aktifkan pendengar status ujian sejak aplikasi dibuka stuy!
+  PretestRepository.listenStatusUjian();
 
   runApp(const MyApp());
 }

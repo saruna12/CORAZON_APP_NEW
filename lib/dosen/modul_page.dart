@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:url_launcher/url_launcher.dart'; // ✅ BARU: Import library untuk buka link
 
 class ModulPage extends StatefulWidget {
   final bool isAdmin;
+  final bool isDosen;
 
-  const ModulPage({super.key, this.isAdmin = false});
+  const ModulPage({
+    super.key,
+    this.isAdmin = false,
+    this.isDosen = false,
+  });
 
   @override
   State<ModulPage> createState() => _ModulPageState();
@@ -16,6 +22,44 @@ class _ModulPageState extends State<ModulPage> {
 
   final TextEditingController _judulController = TextEditingController();
   final TextEditingController _deskripsiController = TextEditingController();
+
+  // ✅ BARU: Fungsi pintar untuk membuka link di browser eksternal
+  Future<void> _bukaLinkMateri(String urlString, BuildContext context) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+
+    // Bersihkan spasi jika ada stuy
+    String formattedUrl = urlString.trim();
+
+    if (formattedUrl.isEmpty) return;
+
+    // Pastikan link memiliki prefix http atau https
+    if (!formattedUrl.startsWith('http://') &&
+        !formattedUrl.startsWith('https://')) {
+      formattedUrl = 'https://$formattedUrl';
+    }
+
+    final Uri url = Uri.parse(formattedUrl);
+
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(
+          url,
+          mode: LaunchMode
+              .externalApplication, // ✅ Buka langsung di browser bawaan HP
+        );
+      } else {
+        messenger.showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Format link tidak valid atau tidak bisa dibuka stuy!')),
+        );
+      }
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Gagal membuka link: $e')),
+      );
+    }
+  }
 
   void _showModulForm(
       {String? docId, String? currentJudul, String? currentDeskripsi}) {
@@ -59,7 +103,6 @@ class _ModulPageState extends State<ModulPage> {
             onPressed: () async {
               if (_judulController.text.trim().isEmpty) return;
 
-              // ✅ FIX: Simpan state navigator dan messenger sebelum await dijalankan
               final navigator = Navigator.of(dialogContext);
               final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -79,7 +122,6 @@ class _ModulPageState extends State<ModulPage> {
                 });
               }
 
-              // ✅ FIX: Gunakan variabel penampung tadi agar linter tidak protes async gaps
               navigator.pop();
               scaffoldMessenger.showSnackBar(
                 SnackBar(
@@ -109,7 +151,6 @@ class _ModulPageState extends State<ModulPage> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              // ✅ FIX: Simpan state navigator dan messenger sebelum await dijalankan
               final navigator = Navigator.of(dialogContext);
               final scaffoldMessenger = ScaffoldMessenger.of(context);
 
@@ -118,7 +159,6 @@ class _ModulPageState extends State<ModulPage> {
                   .doc(docId)
                   .delete();
 
-              // ✅ FIX: Eksekusi menggunakan variabel aman
               navigator.pop();
               scaffoldMessenger.showSnackBar(
                 const SnackBar(content: Text("Modul berhasil dihapus!")),
@@ -133,6 +173,8 @@ class _ModulPageState extends State<ModulPage> {
 
   @override
   Widget build(BuildContext context) {
+    final bool bolehMengelola = widget.isAdmin || widget.isDosen;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F6F6),
       appBar: AppBar(
@@ -145,7 +187,7 @@ class _ModulPageState extends State<ModulPage> {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
-      floatingActionButton: widget.isAdmin
+      floatingActionButton: bolehMengelola
           ? FloatingActionButton(
               backgroundColor: maroonPrimary,
               onPressed: () => _showModulForm(),
@@ -180,8 +222,8 @@ class _ModulPageState extends State<ModulPage> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      widget.isAdmin
-                          ? "Halo Admin/Laboran, silakan klik tombol '+' di kanan bawah untuk meng-input modul materi kuliah pertama stuy!"
+                      bolehMengelola
+                          ? "Halo Admin/Dosen, silakan klik tombol '+' di kanan bawah untuk meng-input modul materi kuliah pertama stuy!"
                           : "Dosen atau Laboran belum meng-upload materi kuliah. Harap tunggu atau hubungi tim akademis ya stuy!",
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.grey, fontSize: 14),
@@ -198,6 +240,7 @@ class _ModulPageState extends State<ModulPage> {
             itemBuilder: (context, index) {
               var doc = snapshot.data!.docs[index];
               Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+              String deskripsiMateri = data['deskripsi'] ?? "";
 
               return Card(
                 elevation: 0,
@@ -224,10 +267,21 @@ class _ModulPageState extends State<ModulPage> {
                         fontWeight: FontWeight.bold, fontSize: 14),
                   ),
                   subtitle: Text(
-                    data['deskripsi'] ?? "Tidak ada deskripsi.",
-                    style: const TextStyle(fontSize: 12),
+                    deskripsiMateri.isEmpty
+                        ? "Tidak ada deskripsi."
+                        : deskripsiMateri,
+                    // ✅ MODIFIKASI: Menyesuaikan gaya teks tautan jika diawali http agar mahasiswa tahu itu link
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: deskripsiMateri.startsWith('http')
+                          ? Colors.blue
+                          : Colors.black54,
+                      decoration: deskripsiMateri.startsWith('http')
+                          ? TextDecoration.underline
+                          : TextDecoration.none,
+                    ),
                   ),
-                  trailing: widget.isAdmin
+                  trailing: bolehMengelola
                       ? Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -250,10 +304,10 @@ class _ModulPageState extends State<ModulPage> {
                       : const Icon(Icons.arrow_forward_ios_rounded,
                           size: 14, color: Colors.grey),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                          content: Text('Membuka ${data['judul'] ?? "Modul"}')),
-                    );
+                    // ✅ PERBAIKAN: Jika ditekan, langsung panggil fungsi pembuka tautan
+                    if (deskripsiMateri.isNotEmpty) {
+                      _bukaLinkMateri(deskripsiMateri, context);
+                    }
                   },
                 ),
               );

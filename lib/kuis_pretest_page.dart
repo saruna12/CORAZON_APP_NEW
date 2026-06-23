@@ -13,20 +13,19 @@ class KuisPretestPage extends StatefulWidget {
 }
 
 class _KuisPretestPageState extends State<KuisPretestPage> {
-  // DIPERBAIKI: Mengubah 'const' menjadi 'final' sesuai aturan class State
   final Color maroonPrimary = const Color(0xFF6B1D2F);
   final Color textDark = const Color(0xFF2C2C2C);
 
-  List<QueryDocumentSnapshot> _daftarSoal = [];
+  List<DocumentSnapshot> _daftarSoal = [];
   bool _isLoading = true;
   int _currentIndex = 0;
 
-  // Map untuk menyimpan jawaban mahasiswa sementara (Indeks Soal -> Indeks Opsi yang Dipilih)
-  final Map<int, int> _jawabanMahasiswa = {};
+  // Map untuk menyimpan jawaban mahasiswa (Indeks Soal -> Huruf Opsi "A"/"B"/"C"/"D")
+  final Map<int, String> _jawabanMahasiswa = {};
 
   // Logika Timer Kontrol
   Timer? _timer;
-  int _waktuTersisa = 600; // Contoh: 10 Menit dalam hitungan detik
+  int _waktuTersisa = 600; // 10 Menit dalam hitungan detik
 
   @override
   void initState() {
@@ -36,14 +35,32 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
 
   void _muatSoalDanMulaiTimer() async {
     try {
-      var soal = await PretestRepository.ambilSemuaSoal();
-      setState(() {
-        _daftarSoal = soal;
-        _isLoading = false;
-      });
+      // 1. Ambil data mentah dari Repository
+      var soalRaw = await PretestRepository.ambilSemuaSoal();
+
+      if (soalRaw.isNotEmpty) {
+        // 2. KUNCI UTAMA ANTI-CURANG: Acak urutan list soal stuy!
+        List<DocumentSnapshot> listAcak = List.from(soalRaw);
+        listAcak.shuffle();
+
+        // 3. BATASI SOAL: Hanya ambil maksimal 5 soal teratas setelah diacak
+        setState(() {
+          _daftarSoal = listAcak.take(5).toList();
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _daftarSoal = [];
+          _isLoading = false;
+        });
+      }
+
       _mulaiTimerMundur();
     } catch (e) {
       debugPrint("Gagal memuat kuis: $e");
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -72,18 +89,20 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
     int jumlahBenar = 0;
     for (int i = 0; i < _daftarSoal.length; i++) {
       var dataSoal = _daftarSoal[i].data() as Map<String, dynamic>;
-      int kunciJawaban = dataSoal['jawaban_benar'] ?? 0;
-      if (_jawabanMahasiswa[i] == kunciJawaban) {
+      String kunciJawaban =
+          dataSoal['kunci'] ?? ""; // Menggunakan 'kunci' dari Excel
+      String jawabanMhs = _jawabanMahasiswa[i] ?? "";
+
+      if (jawabanMhs == kunciJawaban) {
         jumlahBenar++;
       }
     }
 
-    // Hitung Nilai Skala 100
+    // Hitung Nilai Skala 100 berdasarkan 5 soal yang didapat
     int totalNilai = _daftarSoal.isNotEmpty
         ? ((jumlahBenar / _daftarSoal.length) * 100).round()
         : 0;
 
-    // Syarat kelulusan anatomi: Misal minimal nilai 70 stuy
     String statusKelulusan = totalNilai >= 70 ? 'LULUS' : 'TIDAK LULUS';
 
     await PretestRepository.simpanHasilPretest(
@@ -98,10 +117,10 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
         barrierDismissible: false,
         builder: (context) => AlertDialog(
           title: const Text('Kuis Selesai!'),
-          content: Text('Nilai kamu: $totalNilai\nStatus: $statusKelulusan'),
+          content:
+              Text('Nilai kamu: $totalNilai\nStatus: $statusKelulusan stuy.'),
           actions: [
             ElevatedButton(
-              // DIPERBAIKI: Memasang properti warna di dalam styleFrom agar valid
               style: ElevatedButton.styleFrom(backgroundColor: maroonPrimary),
               onPressed: () {
                 Navigator.pop(context); // Tutup dialog
@@ -125,18 +144,35 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+          body: Center(child: CircularProgressIndicator(color: maroonPrimary)));
     }
 
     if (_daftarSoal.isEmpty) {
       return const Scaffold(
-          body: Center(child: Text("Dosen belum menginput soal pretest.")));
+          body:
+              Center(child: Text("Dosen belum menginput soal pretest stuy.")));
     }
 
     var dataSoalSekarang =
         _daftarSoal[_currentIndex].data() as Map<String, dynamic>;
-    String pertanyaan = dataSoalSekarang['pertanyaan'] ?? '';
-    List<dynamic> opsi = dataSoalSekarang['opsi'] ?? [];
+    String pertanyaan = dataSoalSekarang['soal'] ?? '';
+
+    // Susun opsi ke dalam List pasangan (Key: Huruf, Value: Teks Opsi)
+    List<Map<String, String>> listOpsi = [];
+
+    if ((dataSoalSekarang['opsi_a'] ?? '').toString().isNotEmpty) {
+      listOpsi.add({"huruf": "A", "teks": dataSoalSekarang['opsi_a']});
+    }
+    if ((dataSoalSekarang['opsi_b'] ?? '').toString().isNotEmpty) {
+      listOpsi.add({"huruf": "B", "teks": dataSoalSekarang['opsi_b']});
+    }
+    if ((dataSoalSekarang['opsi_c'] ?? '').toString().isNotEmpty) {
+      listOpsi.add({"huruf": "C", "teks": dataSoalSekarang['opsi_c']});
+    }
+    if ((dataSoalSekarang['opsi_d'] ?? '').toString().isNotEmpty) {
+      listOpsi.add({"huruf": "D", "teks": dataSoalSekarang['opsi_d']});
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF9F6F6),
@@ -147,8 +183,7 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
                 color: Colors.white,
                 fontSize: 15)),
         backgroundColor: maroonPrimary,
-        automaticallyImplyLeading:
-            false, // Biar mhs ga sengaja pencet back pas kuis
+        automaticallyImplyLeading: false,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16.0),
@@ -177,7 +212,8 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment
+              .start, // ✅ FIXED: Sudah diperbaiki dari 'cross upgrade'
           children: [
             // Kotak Pertanyaan
             Card(
@@ -188,12 +224,15 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
-                child: Text(
-                  pertanyaan,
-                  style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: textDark),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: Text(
+                    pertanyaan,
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: textDark),
+                  ),
                 ),
               ),
             ),
@@ -202,14 +241,16 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
             // Opsi Jawaban A, B, C, D
             Expanded(
               child: ListView.builder(
-                itemCount: opsi.length,
+                itemCount: listOpsi.length,
                 itemBuilder: (context, index) {
-                  bool isSelected = _jawabanMahasiswa[_currentIndex] == index;
+                  String huruf = listOpsi[index]["huruf"]!;
+                  String teksOpsi = listOpsi[index]["teks"]!;
+                  bool isSelected = _jawabanMahasiswa[_currentIndex] == huruf;
 
                   return GestureDetector(
                     onTap: () {
                       setState(() {
-                        _jawabanMahasiswa[_currentIndex] = index;
+                        _jawabanMahasiswa[_currentIndex] = huruf;
                       });
                     },
                     child: Container(
@@ -233,7 +274,7 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
                             backgroundColor:
                                 isSelected ? maroonPrimary : Colors.grey[300],
                             child: Text(
-                              String.fromCharCode(65 + index),
+                              huruf,
                               style: TextStyle(
                                   fontSize: 11,
                                   color: isSelected ? Colors.white : textDark,
@@ -243,7 +284,7 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              opsi[index].toString(),
+                              teksOpsi,
                               style: TextStyle(
                                   fontSize: 13,
                                   color: textDark,
@@ -260,14 +301,17 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
               ),
             ),
 
-            // Tombol Navigasi Bawah (Sebelumnya / Selanjutnya)
+            // Tombol Navigasi Bawah
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 if (_currentIndex > 0)
                   OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: maroonPrimary)),
                     onPressed: () => setState(() => _currentIndex--),
-                    child: const Text('Sebelumnya'),
+                    child: Text('Sebelumnya',
+                        style: TextStyle(color: maroonPrimary)),
                   )
                 else
                   const SizedBox(),
@@ -281,7 +325,6 @@ class _KuisPretestPageState extends State<KuisPretestPage> {
                       _submitKuisOtomatis();
                     }
                   },
-                  // DIPERBAIKI: Memasang const pada text widget untuk efisiensi render
                   child: Text(
                     _currentIndex == _daftarSoal.length - 1
                         ? 'Selesai & Kumpulkan'
