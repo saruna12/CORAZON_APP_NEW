@@ -149,9 +149,9 @@ class HasilPretestPage extends StatelessWidget {
                   String npm = data['npm'] ?? '-';
                   String email = data['email'] ?? '-';
                   int nilaiPre = data['nilai_pretest'] ?? 0;
-                  int nilaiPost = data['nilai_posttest'] ?? 0;
+                  int nilaiPost = data['nilai_postest'] ?? 0;
                   String statusPre = data['status_pretest'] ?? 'BELUM';
-                  String statusPost = data['status_posttest'] ?? 'BELUM';
+                  String statusPost = data['status_postest'] ?? 'BELUM';
 
                   // Status akhir: lulus kalau keduanya lulus
                   bool sudahKeduanya =
@@ -330,9 +330,9 @@ class HasilPretestPage extends StatelessWidget {
         if (snapshot.hasData && snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           nilaiPretest = data['nilai_pretest'] ?? 0;
-          nilaiPosttest = data['nilai_posttest'] ?? 0;
+          nilaiPosttest = data['nilai_postest'] ?? 0;
           statusPre = data['status_pretest'] ?? 'BELUM DIAMBIL';
-          statusPost = data['status_posttest'] ?? 'BELUM DIAMBIL';
+          statusPost = data['status_postest'] ?? 'BELUM DIAMBIL';
         }
 
         bool sudahKeduanya =
