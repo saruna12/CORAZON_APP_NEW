@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../pretest_repository.dart';
-import 'kuis_pretest_page.dart'; // ✅ FIX: Import halaman kuis yang asli
+import 'pretest_repository.dart';
+import 'kuis_pretest_page.dart';
 
 class GerbangUjianPage extends StatefulWidget {
-  final bool isPretest; // true untuk Pretest, false untuk Posttest
+  final bool isPretest;
 
   const GerbangUjianPage({super.key, required this.isPretest});
 
@@ -50,7 +50,6 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
     );
   }
 
-  // 🔒 TAMPILAN AKSES BELUM DIBUKA
   Widget _buildScreenTerkunci() {
     return Center(
       child: Padding(
@@ -80,9 +79,7 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
     );
   }
 
-  // 🏁 TAMPILAN SEBELUM MULAI
   Widget _buildScreenSiapMulai(BuildContext context) {
-    // ✅ FIX: Ambil userId dari Firebase Auth
     final String userId = FirebaseAuth.instance.currentUser?.uid ?? "";
 
     return Center(
@@ -121,8 +118,6 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
               _buildInfoRow(
                   Icons.rule_rounded, 'Batas Kelulusan', 'Minimal Skor 70'),
               const SizedBox(height: 24),
-
-              // ✅ FIX: Warning jika belum login
               if (userId.isEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -146,8 +141,6 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
                   ),
                 ),
               ],
-
-              // TOMBOL MULAI
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -160,7 +153,6 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  // ✅ FIX: Hubungkan ke KuisPretestPage yang asli
                   onPressed: userId.isEmpty
                       ? null
                       : () {

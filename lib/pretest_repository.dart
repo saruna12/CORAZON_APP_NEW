@@ -2,28 +2,69 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PretestRepository {
-  // 📡 Pemantau Status Live Ujian
-  static final ValueNotifier<bool> statusUjianLive = ValueNotifier<bool>(false);
+  // 📡 Pemantau Status Live Pretest & Posttest
+  static final ValueNotifier<bool> statusPretestLive = ValueNotifier<bool>(false);
+  static final ValueNotifier<String> kunciPretestLive = ValueNotifier<String>("");
 
-  // 1. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian di Firestore
-  static Future<void> ubahStatusUjian(bool statusBaru) async {
+  static final ValueNotifier<bool> statusPosttestLive = ValueNotifier<bool>(false);
+  static final ValueNotifier<String> kunciPosttestLive = ValueNotifier<String>("");
+
+  // ValueNotifier kompatibilitas lama
+  static final ValueNotifier<bool> statusUjianLive = statusPretestLive;
+
+  // 1. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian & Token Pretest di Firestore
+  static Future<void> ubahStatusUjian(bool statusBaru, {String? kunciAkses}) async {
     try {
+      Map<String, dynamic> data = {
+        'is_aktif': statusBaru,
+        'updated_at': FieldValue.serverTimestamp(),
+      };
+      if (kunciAkses != null) {
+        data['kunci_akses'] = kunciAkses.trim();
+      }
+
       await FirebaseFirestore.instance
           .collection('bank_soal')
           .doc('kontrol_pretest')
-          .set({
+          .set(data, SetOptions(merge: true));
+
+      statusPretestLive.value = statusBaru;
+      if (kunciAkses != null) {
+        kunciPretestLive.value = kunciAkses.trim();
+      }
+    } catch (e) {
+      debugPrint("Gagal mengubah status akses ujian pretest: $e");
+    }
+  }
+
+  // 1b. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian & Token Posttest di Firestore
+  static Future<void> ubahStatusPosttest(bool statusBaru, {String? kunciAkses}) async {
+    try {
+      Map<String, dynamic> data = {
         'is_aktif': statusBaru,
         'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      };
+      if (kunciAkses != null) {
+        data['kunci_akses'] = kunciAkses.trim();
+      }
 
-      statusUjianLive.value = statusBaru;
+      await FirebaseFirestore.instance
+          .collection('bank_soal')
+          .doc('kontrol_posttest')
+          .set(data, SetOptions(merge: true));
+
+      statusPosttestLive.value = statusBaru;
+      if (kunciAkses != null) {
+        kunciPosttestLive.value = kunciAkses.trim();
+      }
     } catch (e) {
-      debugPrint("Gagal mengubah status akses ujian: $e");
+      debugPrint("Gagal mengubah status akses ujian posttest: $e");
     }
   }
 
   // 2. Fungsi untuk Mahasiswa: Standby dengerin perubahan sakelar Dosen (Real-time)
   static void listenStatusUjian() {
+    // Listen Pretest
     FirebaseFirestore.instance
         .collection('bank_soal')
         .doc('kontrol_pretest')
@@ -31,7 +72,21 @@ class PretestRepository {
         .listen((snapshot) {
       if (snapshot.exists && snapshot.data() != null) {
         var data = snapshot.data() as Map<String, dynamic>;
-        statusUjianLive.value = data['is_aktif'] ?? false;
+        statusPretestLive.value = data['is_aktif'] ?? false;
+        kunciPretestLive.value = data['kunci_akses'] ?? "";
+      }
+    });
+
+    // Listen Posttest
+    FirebaseFirestore.instance
+        .collection('bank_soal')
+        .doc('kontrol_posttest')
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        var data = snapshot.data() as Map<String, dynamic>;
+        statusPosttestLive.value = data['is_aktif'] ?? false;
+        kunciPosttestLive.value = data['kunci_akses'] ?? "";
       }
     });
   }
@@ -43,12 +98,11 @@ class PretestRepository {
     required String status,
   }) async {
     try {
-      // ✅ Simpan ke users/{uid} — sesuai yang dibaca beranda.dart
       await FirebaseFirestore.instance.collection('users').doc(userId).set({
         'nilai_pretest': nilai,
         'status_pretest': status,
         'waktu_pretest': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true)); // merge: true agar data lain tidak tertimpa
+      }, SetOptions(merge: true));
 
       debugPrint("Nilai pretest mahasiswa $userId berhasil direkam!");
     } catch (e) {
@@ -56,7 +110,7 @@ class PretestRepository {
     }
   }
 
-  // 4. ✅ Simpan nilai postest ke users/{uid}
+  // 4. ✅ Simpan nilai posttest ke users/{uid} (menggunakan dua 't' secara standar)
   static Future<void> simpanHasilPosttest({
     required String userId,
     required int nilai,
@@ -64,14 +118,14 @@ class PretestRepository {
   }) async {
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).set({
-        'nilai_postest': nilai,
-        'status_postest': status,
-        'waktu_postest': FieldValue.serverTimestamp(),
+        'nilai_posttest': nilai,
+        'status_posttest': status,
+        'waktu_posttest': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      debugPrint("Nilai postest mahasiswa $userId berhasil direkam!");
+      debugPrint("Nilai posttest mahasiswa $userId berhasil direkam!");
     } catch (e) {
-      debugPrint("Gagal menyimpan nilai postest ke database: $e");
+      debugPrint("Gagal menyimpan nilai posttest ke database: $e");
     }
   }
 

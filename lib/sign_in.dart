@@ -36,43 +36,61 @@ class _SignInPageState extends State<SignInPage> {
 
     setState(() => _isLoading = true);
 
-    // ================= JALUR 1: DATA STAF / ADMIN LAB (Tanpa Firebase) =================
-    if ((inputUser == 'dosen' && password == 'dosen123') ||
-        (inputUser == 'laboran' && password == 'laboran123') ||
-        (inputUser == 'asdos' && password == 'asdos123') ||
-        (inputUser == 'admin' && password == 'admin123')) {
-      setState(() => _isLoading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const DosenBerandaPage()),
-      );
-      _showSnackbar('Login Sukses sebagai ${inputUser.toUpperCase()}');
-      return;
-    }
-
-    // ================= JALUR 2: LOGIN MAHASISWA (Lewat Firebase) =================
+    // Login semua pengguna melalui Firebase Authentication.
+    // Jika pengguna mengetik NPM atau email, kami akan menyelesaikannya ke email yang terdaftar.
     try {
-      // Login menggunakan Firebase Auth
+      String loginEmail = await _resolveLoginEmail(inputUser);
       UserCredential userCredential = await FirebaseAuth.instance
-          .signInWithEmailAndPassword(email: inputUser, password: password);
+          .signInWithEmailAndPassword(email: loginEmail, password: password);
 
       String? uid = userCredential.user?.uid;
 
       if (uid != null) {
-        // Ambil data nama asli mahasiswa dari Cloud Firestore berdasarkan UID
+        // Ambil data pengguna dari Cloud Firestore berdasarkan UID
         DocumentSnapshot userDoc =
             await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
-        String namaMhs = userDoc.exists
-            ? (userDoc.data() as Map<String, dynamic>)['nama'] ?? 'Mahasiswa'
-            : 'Mahasiswa';
+        String role = 'mahasiswa';
+        String namaMhs = 'Mahasiswa';
+        Map<String, dynamic> data = {};
+        if (userDoc.exists && userDoc.data() != null) {
+          data = userDoc.data() as Map<String, dynamic>;
+          role = data['role'] ?? 'mahasiswa';
+          namaMhs = data['nama'] ?? namaMhs;
+
+          // Perbaiki data pengguna jika field penting belum ada
+          final updateData = <String, Object>{};
+          if (!data.containsKey('role')) {
+            updateData['role'] = 'mahasiswa';
+          }
+          if (!data.containsKey('status_pretest')) {
+            updateData['status_pretest'] = 'BELUM DIAMBIL';
+          }
+          if (!data.containsKey('status_postest')) {
+            updateData['status_postest'] = 'BELUM DIAMBIL';
+          }
+          if (updateData.isNotEmpty) {
+            await FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .set(updateData, SetOptions(merge: true));
+          }
+        }
 
         if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-                builder: (context) => BerandaPage(namaMahasiswa: namaMhs)),
-          );
+          if (role == 'mahasiswa') {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                  builder: (context) => BerandaPage(namaMahasiswa: namaMhs)),
+            );
+          } else {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => const DosenBerandaPage()),
+            );
+          }
+          _showSnackbar('Login sukses sebagai ${role.toUpperCase()}');
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -91,6 +109,34 @@ class _SignInPageState extends State<SignInPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<String> _resolveLoginEmail(String inputUser) async {
+    if (inputUser.contains('@')) {
+      return inputUser;
+    }
+
+    final queryByEmail = await FirebaseFirestore.instance
+        .collection('users')
+        .where('email', isEqualTo: inputUser)
+        .limit(1)
+        .get();
+    if (queryByEmail.docs.isNotEmpty) {
+      final data = queryByEmail.docs.first.data();
+      return (data['email'] ?? inputUser).toString();
+    }
+
+    final queryByNpm = await FirebaseFirestore.instance
+        .collection('users')
+        .where('npm', isEqualTo: inputUser)
+        .limit(1)
+        .get();
+    if (queryByNpm.docs.isNotEmpty) {
+      final data = queryByNpm.docs.first.data();
+      return (data['email'] ?? inputUser).toString();
+    }
+
+    return inputUser;
   }
 
   void _showSnackbar(String pesan) {
@@ -134,7 +180,7 @@ class _SignInPageState extends State<SignInPage> {
                       controller: _emailOrUsernameController,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        hintText: 'Masukkan email Anda / username staf',
+                        hintText: 'Masukkan email atau NPM (Mahasiswa)',
                         hintStyle:
                             TextStyle(color: Colors.black38, fontSize: 13),
                         contentPadding:

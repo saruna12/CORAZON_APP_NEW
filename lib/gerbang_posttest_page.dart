@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'kuis_posttest_page.dart';
+import 'pretest_repository.dart'; // ✅ Import repository stuy
 
 class GerbangPosttestPage extends StatefulWidget {
   const GerbangPosttestPage({super.key});
@@ -12,33 +12,18 @@ class GerbangPosttestPage extends StatefulWidget {
 
 class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
   final Color maroonPrimary = const Color(0xFF6B1D2F);
-
-  // ✅ ValueNotifier khusus postest — tidak pakai milik pretest
-  final ValueNotifier<bool> _statusPosttestLive = ValueNotifier<bool>(false);
+  final TextEditingController _tokenController = TextEditingController();
+  bool _isTokenValid = false;
 
   @override
   void initState() {
     super.initState();
-    _listenStatusPosttest();
-  }
-
-  void _listenStatusPosttest() {
-    FirebaseFirestore.instance
-        .collection('bank_soal')
-        .doc('kontrol_postest') // ✅ dokumen khusus postest
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists && snapshot.data() != null) {
-        _statusPosttestLive.value = snapshot.data()!['is_aktif'] ?? false;
-      } else {
-        _statusPosttestLive.value = false;
-      }
-    });
+    PretestRepository.listenStatusUjian();
   }
 
   @override
   void dispose() {
-    _statusPosttestLive.dispose();
+    _tokenController.dispose();
     super.dispose();
   }
 
@@ -57,7 +42,7 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
         elevation: 0,
       ),
       body: ValueListenableBuilder<bool>(
-        valueListenable: _statusPosttestLive, // ✅ pakai notifier postest
+        valueListenable: PretestRepository.statusPosttestLive, // ✅ pakai notifier postest terpusat
         builder: (context, isOpen, child) {
           if (!isOpen) {
             return _buildScreenTerkunci();
@@ -136,7 +121,28 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
               const SizedBox(height: 8),
               _buildInfoRow(Icons.rule_rounded, 'Batas Kelulusan',
                   'Minimal Skor 60'), // ✅ fix: 60 bukan 70
+              // INPUT TOKEN/KUNCI AKSES
+              TextField(
+                controller: _tokenController,
+                onChanged: (val) {
+                  setState(() {
+                    _isTokenValid = val.trim() == PretestRepository.kunciPosttestLive.value;
+                  });
+                },
+                decoration: InputDecoration(
+                  labelText: 'Masukkan Kunci Akses (Token)',
+                  hintText: 'Hubungi dosen/laboran untuk token post-test',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  prefixIcon: const Icon(Icons.key),
+                  suffixIcon: _isTokenValid
+                      ? const Icon(Icons.check_circle, color: Colors.green)
+                      : null,
+                ),
+              ),
               const SizedBox(height: 24),
+
               if (userId.isEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -166,13 +172,13 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
-                        userId.isEmpty ? Colors.grey : maroonPrimary,
+                        (userId.isEmpty || !_isTokenValid) ? Colors.grey : maroonPrimary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  onPressed: userId.isEmpty
+                  onPressed: (userId.isEmpty || !_isTokenValid)
                       ? null
                       : () {
                           Navigator.pushReplacement(

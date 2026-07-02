@@ -46,7 +46,7 @@ class DosenPage extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const HasilPretestPage(),
+                  builder: (_) => const HasilPretestPage(isDosen: true),
                 ),
               );
             },

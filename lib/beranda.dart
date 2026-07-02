@@ -3,8 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in.dart';
 import 'dosen/modul_page.dart';
-import 'gerbang_ujian_page.dart'; // ✅ Tetap dipertahankan stuy
-import 'gerbang_posttest_page.dart'; // ✅ Tambahan untuk Gerbang Posttest
+import 'gerbang_ujian_page.dart';
+import 'gerbang_posttest_page.dart'; // ✅ Tetap dipertahankan stuy
 
 class BerandaPage extends StatefulWidget {
   final String namaMahasiswa;
@@ -28,6 +28,8 @@ class _BerandaPageState extends State<BerandaPage> {
   String namaTampil = "";
   String npmTampil = "";
   bool isLoading = true;
+  bool _checkingAuthorization = true;
+  bool _isAuthorized = false;
 
   int skorPretest = 0;
   String statusPretest = "BELUM DIAMBIL";
@@ -39,7 +41,56 @@ class _BerandaPageState extends State<BerandaPage> {
     super.initState();
     namaTampil = widget.namaMahasiswa;
     npmTampil = widget.npmMahasiswa;
-    _listenDataMahasiswaDanNilai();
+    _checkAuthorization();
+  }
+
+  Future<void> _checkAuthorization() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _redirectToSignIn();
+      return;
+    }
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      final role = snapshot.exists && snapshot.data() != null
+          ? (snapshot.data() as Map<String, dynamic>)['role']?.toString() ?? ''
+          : '';
+
+      if (role != 'mahasiswa') {
+        await FirebaseAuth.instance.signOut();
+        _redirectToSignIn();
+        return;
+      }
+
+      _listenDataMahasiswaDanNilai();
+      if (mounted) {
+        setState(() {
+          _isAuthorized = true;
+          _checkingAuthorization = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _checkingAuthorization = false;
+          _isAuthorized = false;
+        });
+      }
+      await FirebaseAuth.instance.signOut();
+      _redirectToSignIn();
+    }
+  }
+
+  void _redirectToSignIn() {
+    if (!mounted) return;
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const SignInPage()),
+      (route) => false,
+    );
   }
 
   void _listenDataMahasiswaDanNilai() {
@@ -77,6 +128,21 @@ class _BerandaPageState extends State<BerandaPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAuthorization) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF9F6F6),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!_isAuthorized) {
+      return const Scaffold(
+        backgroundColor: Color(0xFFF9F6F6),
+        body: Center(
+            child: Text('Akses tidak diizinkan. Mengarahkan ke login...')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF9F6F6),
       appBar: AppBar(
@@ -182,7 +248,7 @@ class _BerandaPageState extends State<BerandaPage> {
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '"Siap mengeksplorasi visualisasi anatomi kardiovaskular hari ini?"',
+                      '“Siap mengeksplorasi visualisasi anatomi kardiovaskular hari ini?”',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 12,
@@ -391,7 +457,6 @@ class _BerandaPageState extends State<BerandaPage> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  // ✅ MODIFIKASI: Tombol Ambil Postest diarahkan ke GerbangPosttestPage
                   _buildElevatedButton(
                     'Ambil Postest',
                     onPressed: () {

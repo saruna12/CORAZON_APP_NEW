@@ -1,14 +1,30 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'pretest_repository.dart'; // ✅ Pakai repository yang sama dengan pretest
 
-// ============================================================
-// POSTTEST REPOSITORY (digabung langsung di sini)
-// ============================================================
-class PosttestRepository {
-  static final ValueNotifier<bool> statusUjianLive = ValueNotifier<bool>(false);
+// Kontrol akses posttest pakai dokumen SENDIRI di Firestore: kontrol_posttest
+// Tapi simpan hasil tetap lewat PretestRepository.simpanHasilPosttest()
 
-  static Future<void> ubahStatusUjian(bool statusBaru) async {
+// Listener status posttest (terpisah dari pretest)
+class PosttestController {
+  static final ValueNotifier<bool> statusPosttestLive =
+      ValueNotifier<bool>(false);
+
+  static void listenStatusPosttest() {
+    FirebaseFirestore.instance
+        .collection('bank_soal')
+        .doc('kontrol_posttest')
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists && snapshot.data() != null) {
+        var data = snapshot.data() as Map<String, dynamic>;
+        statusPosttestLive.value = data['is_aktif'] ?? false;
+      }
+    });
+  }
+
+  static Future<void> ubahStatusPosttest(bool statusBaru) async {
     try {
       await FirebaseFirestore.instance
           .collection('bank_soal')
@@ -17,107 +33,13 @@ class PosttestRepository {
         'is_aktif': statusBaru,
         'updated_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
-      statusUjianLive.value = statusBaru;
+      statusPosttestLive.value = statusBaru;
     } catch (e) {
-      debugPrint("Gagal mengubah status akses ujian posttest: $e");
-    }
-  }
-
-  static void listenStatusUjian() {
-    FirebaseFirestore.instance
-        .collection('bank_soal')
-        .doc('kontrol_posttest')
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists && snapshot.data() != null) {
-        var data = snapshot.data() as Map<String, dynamic>;
-        statusUjianLive.value = data['is_aktif'] ?? false;
-      }
-    });
-  }
-
-  static Future<void> simpanHasilPosttest({
-    required String userId,
-    required int nilai,
-    required String status,
-  }) async {
-    try {
-      await FirebaseFirestore.instance.collection('users').doc(userId).set({
-        'nilai_posttest': nilai,
-        'status_posttest': status,
-        'waktu_posttest': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      debugPrint("Nilai posttest mahasiswa $userId berhasil direkam!");
-    } catch (e) {
-      debugPrint("Gagal menyimpan nilai posttest: $e");
-    }
-  }
-
-  static Future<void> importMassalBankSoal(List<List<dynamic>> rows) async {
-    try {
-      final collectionRef = FirebaseFirestore.instance
-          .collection('bank_soal')
-          .doc('paket_utama_posttest')
-          .collection('daftar_soal');
-
-      for (var row in rows) {
-        if (row.isEmpty || row[0].toString().toLowerCase().contains('no')) {
-          continue; // ✅ FIX: dibungkus kurung kurawal
-        }
-        if (row.length < 2 ||
-            row[1] == null ||
-            row[1].toString().trim().isEmpty) {
-          continue; // ✅ FIX: dibungkus kurung kurawal
-        }
-
-        String pertanyaan = row[1].toString().trim();
-        String opsiA =
-            row.length > 2 && row[2] != null ? row[2].toString().trim() : '';
-        String opsiB =
-            row.length > 3 && row[3] != null ? row[3].toString().trim() : '';
-        String opsiC =
-            row.length > 4 && row[4] != null ? row[4].toString().trim() : '';
-        String opsiD =
-            row.length > 5 && row[5] != null ? row[5].toString().trim() : '';
-        String kunciHuruf = row.length > 6 && row[6] != null
-            ? row[6].toString().trim().toUpperCase()
-            : 'A';
-
-        int kunciAngka = 0;
-        switch (kunciHuruf) {
-          case 'A':
-            kunciAngka = 0;
-            break;
-          case 'B':
-            kunciAngka = 1;
-            break;
-          case 'C':
-            kunciAngka = 2;
-            break;
-          case 'D':
-            kunciAngka = 3;
-            break;
-          default:
-            kunciAngka = 0;
-        }
-
-        await collectionRef.add({
-          'pertanyaan': pertanyaan,
-          'opsi': [opsiA, opsiB, opsiC, opsiD],
-          'jawaban_benar': kunciAngka,
-          'created_at': FieldValue.serverTimestamp(),
-        });
-      }
-      debugPrint("Semua soal posttest berhasil di-import!");
-    } catch (e) {
-      throw Exception(e.toString());
+      debugPrint("Gagal mengubah status akses posttest: $e");
     }
   }
 }
 
-// ============================================================
-// KUIS POSTTEST PAGE
-// ============================================================
 class KuisPosttestPage extends StatefulWidget {
   final String userId;
   const KuisPosttestPage({super.key, required this.userId});
@@ -136,19 +58,21 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
   final Map<int, int> _jawabanMahasiswa = {};
 
   Timer? _timer;
-  int _waktuTersisa = 600;
+  int _waktuTersisa = 600; // 10 Menit
 
   @override
   void initState() {
     super.initState();
+    PosttestController.listenStatusPosttest();
     _muatSoalDanMulaiTimer();
   }
 
+  // ✅ Soal diambil dari bank soal PRETEST (sama)
   void _muatSoalDanMulaiTimer() async {
     try {
       var querySnapshot = await FirebaseFirestore.instance
           .collection('bank_soal')
-          .doc('paket_utama_posttest')
+          .doc('paket_utama_pretest') // ✅ Sama dengan pretest
           .collection('daftar_soal')
           .get();
 
@@ -156,7 +80,8 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
 
       if (soalRaw.isNotEmpty) {
         List<DocumentSnapshot> listAcak = List.from(soalRaw);
-        listAcak.shuffle();
+        listAcak.shuffle(); // Acak soal biar beda urutannya dari pretest
+
         if (mounted) {
           setState(() {
             _daftarSoal = listAcak.take(5).toList();
@@ -218,9 +143,11 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
     int totalNilai = _daftarSoal.isNotEmpty
         ? ((jumlahBenar / _daftarSoal.length) * 100).round()
         : 0;
+
     String statusKelulusan = totalNilai >= 70 ? 'LULUS' : 'TIDAK LULUS';
 
-    await PosttestRepository.simpanHasilPosttest(
+    // ✅ Simpan via PretestRepository → field nilai_postest & status_postest
+    await PretestRepository.simpanHasilPosttest(
       userId: widget.userId,
       nilai: totalNilai,
       status: statusKelulusan,
@@ -261,7 +188,8 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
-      valueListenable: PosttestRepository.statusUjianLive,
+      valueListenable:
+          PosttestController.statusPosttestLive, // ✅ Pakai kontrol posttest
       builder: (context, isLive, child) {
         if (!isLive) {
           return Scaffold(
@@ -275,16 +203,19 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                     Icon(Icons.lock_clock_rounded,
                         size: 80, color: maroonPrimary),
                     const SizedBox(height: 24),
-                    Text("POSTTEST DITUTUP OLEH DOSEN",
-                        style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: textDark)),
+                    Text(
+                      "POSTTEST DITUTUP OLEH DOSEN",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: textDark),
+                    ),
                     const SizedBox(height: 12),
                     const Text(
-                        "Waktu akses habis atau sesi dikunci oleh dosen.",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: Colors.grey)),
+                      "Waktu akses habis atau sesi pengerjaan telah dikunci oleh dosen.",
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: Colors.grey),
+                    ),
                     const SizedBox(height: 24),
                     ElevatedButton(
                       style: ElevatedButton.styleFrom(
@@ -309,7 +240,7 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                 children: [
                   CircularProgressIndicator(color: maroonPrimary),
                   const SizedBox(height: 16),
-                  const Text("Mengekstrak kuis posttest acak kamu...",
+                  const Text("Mengekstrak soal posttest acak kamu...",
                       style: TextStyle(fontStyle: FontStyle.italic)),
                 ],
               ),
@@ -327,7 +258,7 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                   Icon(Icons.assignment_late_rounded,
                       size: 60, color: maroonPrimary),
                   const SizedBox(height: 16),
-                  const Text("Belum ada soal posttest tersedia.",
+                  const Text("Belum ada soal tersedia.",
                       style: TextStyle(fontWeight: FontWeight.bold)),
                 ],
               ),
@@ -392,11 +323,13 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                     padding: const EdgeInsets.all(16.0),
                     child: SizedBox(
                       width: double.infinity,
-                      child: Text(pertanyaan,
-                          style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: textDark)),
+                      child: Text(
+                        pertanyaan,
+                        style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: textDark),
+                      ),
                     ),
                   ),
                 ),
@@ -437,23 +370,26 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                                 backgroundColor: isSelected
                                     ? maroonPrimary
                                     : Colors.grey[300],
-                                child: Text(hurufAwalan,
-                                    style: TextStyle(
-                                        fontSize: 11,
-                                        color: isSelected
-                                            ? Colors.white
-                                            : textDark,
-                                        fontWeight: FontWeight.bold)),
+                                child: Text(
+                                  hurufAwalan,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color:
+                                          isSelected ? Colors.white : textDark,
+                                      fontWeight: FontWeight.bold),
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
-                                child: Text(opsi[index],
-                                    style: TextStyle(
-                                        fontSize: 13,
-                                        color: textDark,
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.normal)),
+                                child: Text(
+                                  opsi[index],
+                                  style: TextStyle(
+                                      fontSize: 13,
+                                      color: textDark,
+                                      fontWeight: isSelected
+                                          ? FontWeight.bold
+                                          : FontWeight.normal),
+                                ),
                               ),
                             ],
                           ),

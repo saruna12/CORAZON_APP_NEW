@@ -52,12 +52,15 @@ class _RegisterPageState extends State<RegisterPage> {
       String? uid = userCredential.user?.uid;
 
       if (uid != null) {
-        // 2. Simpan data tambahan (Nama & NPM) di Cloud Firestore
+        // 2. Simpan data tambahan (Nama, NPM, Role) di Cloud Firestore
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'uid': uid,
           'nama': name,
           'npm': npm,
           'email': email,
+          'role': 'mahasiswa',
+          'status_pretest': 'BELUM DIAMBIL',
+          'status_postest': 'BELUM DIAMBIL',
           'waktu_daftar': DateTime.now().toString(),
         });
 

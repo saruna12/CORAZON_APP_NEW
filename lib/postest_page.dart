@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'kuis_posttest_page.dart'; // PosttestRepository ada di sini
+import 'pretest_repository.dart'; // ✅ FIX: Pakai PretestRepository, bukan PosttestRepository
+import 'kuis_posttest_page.dart';
 
 class PosttestPage extends StatefulWidget {
   const PosttestPage({super.key});
@@ -15,7 +16,8 @@ class _PosttestPageState extends State<PosttestPage> {
   @override
   void initState() {
     super.initState();
-    PosttestRepository.listenStatusUjian();
+    PretestRepository
+        .listenStatusUjian(); // ✅ FIX: Ganti PosttestRepository → PretestRepository
   }
 
   @override
@@ -59,6 +61,8 @@ class _PosttestPageState extends State<PosttestPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
+
+                  // Info user yang login
                   if (userId.isNotEmpty)
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -81,6 +85,8 @@ class _PosttestPageState extends State<PosttestPage> {
                         ],
                       ),
                     ),
+
+                  // Warning belum login
                   if (userId.isEmpty)
                     Container(
                       padding: const EdgeInsets.all(12),
@@ -104,9 +110,12 @@ class _PosttestPageState extends State<PosttestPage> {
                         ],
                       ),
                     ),
+
                   const SizedBox(height: 24),
+
+                  // ✅ FIX: Pakai PretestRepository.statusUjianLive
                   ValueListenableBuilder<bool>(
-                    valueListenable: PosttestRepository.statusUjianLive,
+                    valueListenable: PretestRepository.statusUjianLive,
                     builder: (context, isLive, child) {
                       if (!isLive) {
                         return Container(

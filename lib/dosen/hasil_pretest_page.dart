@@ -102,7 +102,7 @@ class HasilPretestPage extends StatelessWidget {
                   ),
                   Expanded(
                     flex: 3,
-                    child: Text('Nama & NPM',
+                    child: Text('Nama, NPM & Email',
                         style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -145,9 +145,9 @@ class HasilPretestPage extends StatelessWidget {
                 itemCount: docs.length,
                 itemBuilder: (context, index) {
                   final data = docs[index].data() as Map<String, dynamic>;
-
                   String nama = data['nama'] ?? '-';
                   String npm = data['npm'] ?? '-';
+                  String email = data['email'] ?? '-';
                   int nilaiPre = data['nilai_pretest'] ?? 0;
                   int nilaiPost = data['nilai_posttest'] ?? 0;
                   String statusPre = data['status_pretest'] ?? 'BELUM';
@@ -194,7 +194,7 @@ class HasilPretestPage extends StatelessWidget {
                           ),
                         ),
 
-                        // Nama & NPM
+                        // Nama, NPM & Email
                         Expanded(
                           flex: 3,
                           child: Column(
@@ -211,6 +211,13 @@ class HasilPretestPage extends StatelessWidget {
                                 npm,
                                 style: TextStyle(
                                     fontSize: 11, color: Colors.grey.shade500),
+                              ),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                    fontSize: 10, color: Colors.grey.shade400),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
                           ),
