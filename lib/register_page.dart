@@ -38,7 +38,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     if (!RegExp(r'^[0-9]+$').hasMatch(npm)) {
-      _showSnackbar('NPM harus berupa angka!');
+      _showSnackbar('NIM/NIP harus berupa angka!');
       return;
     }
 
@@ -52,15 +52,21 @@ class _RegisterPageState extends State<RegisterPage> {
       String? uid = userCredential.user?.uid;
 
       if (uid != null) {
-        // 2. Simpan data tambahan (Nama, NPM, Role) di Cloud Firestore
+        // 2. Simpan data tambahan (Nama, NIM/NIP, Role) di Cloud Firestore
+        // Catatan: nilai NIM/NIP disimpan ke KEDUA field ('npm' dan 'nip')
+        // supaya, apapun role akun ini nanti (mahasiswa atau dosen, yang
+        // diubah manual lewat Firebase Console), datanya tetap terbaca
+        // dengan benar di kedua sisi (dosen_beranda_page.dart membaca
+        // field 'nip', sedangkan sisi mahasiswa membaca field 'npm').
         await FirebaseFirestore.instance.collection('users').doc(uid).set({
           'uid': uid,
           'nama': name,
           'npm': npm,
+          'nip': npm,
           'email': email,
           'role': 'mahasiswa',
           'status_pretest': 'BELUM DIAMBIL',
-          'status_postest': 'BELUM DIAMBIL',
+          'status_posttest': 'BELUM DIAMBIL',
           'waktu_daftar': DateTime.now().toString(),
         });
 
@@ -96,7 +102,7 @@ class _RegisterPageState extends State<RegisterPage> {
         return AlertDialog(
           title: const Text('🎉 Registrasi Berhasil'),
           content: Text(
-              'Akun Mahasiswa atas nama $name dengan NPM $npm telah tersimpan di Firebase.'),
+              'Akun atas nama $name dengan NIM/NIP $npm telah tersimpan di Firebase.'),
           actions: [
             TextButton(
               onPressed: () {
@@ -159,7 +165,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  const Text('NPM (Nomor Pokok Mahasiswa)',
+                  const Text('NIM / NIP',
                       style: TextStyle(fontWeight: FontWeight.w500)),
                   const SizedBox(height: 6),
                   Container(

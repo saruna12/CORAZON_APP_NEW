@@ -72,20 +72,6 @@ class HasilPretestPage extends StatelessWidget {
 
         return Column(
           children: [
-            // Info jumlah mahasiswa
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: maroonPrimary.withValues(alpha: 0.05),
-              child: Text(
-                'Total Mahasiswa: ${docs.length}',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: maroonPrimary,
-                    fontSize: 13),
-              ),
-            ),
-
             // Header Tabel
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -149,13 +135,14 @@ class HasilPretestPage extends StatelessWidget {
                   String npm = data['npm'] ?? '-';
                   String email = data['email'] ?? '-';
                   int nilaiPre = data['nilai_pretest'] ?? 0;
-                  int nilaiPost = data['nilai_postest'] ?? 0;
-                  String statusPre = data['status_pretest'] ?? 'BELUM';
-                  String statusPost = data['status_postest'] ?? 'BELUM';
+                  int nilaiPost = data['nilai_posttest'] ?? 0;
+                  String statusPre = data['status_pretest'] ?? 'BELUM DIAMBIL';
+                  String statusPost =
+                      data['status_posttest'] ?? 'BELUM DIAMBIL';
 
                   // Status akhir: lulus kalau keduanya lulus
-                  bool sudahKeduanya =
-                      statusPre != 'BELUM' && statusPost != 'BELUM';
+                  bool sudahKeduanya = statusPre != 'BELUM DIAMBIL' &&
+                      statusPost != 'BELUM DIAMBIL';
                   bool lulusKeduanya =
                       statusPre == 'LULUS' && statusPost == 'LULUS';
 
@@ -230,18 +217,18 @@ class HasilPretestPage extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 4),
                             decoration: BoxDecoration(
-                              color: statusPre == 'BELUM'
+                              color: statusPre == 'BELUM DIAMBIL'
                                   ? Colors.grey.shade100
                                   : Colors.blue.shade50,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              statusPre == 'BELUM' ? '-' : '$nilaiPre',
+                              statusPre == 'BELUM DIAMBIL' ? '-' : '$nilaiPre',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: statusPre == 'BELUM'
+                                  color: statusPre == 'BELUM DIAMBIL'
                                       ? Colors.grey
                                       : Colors.blue.shade700),
                             ),
@@ -256,18 +243,20 @@ class HasilPretestPage extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 4),
                             decoration: BoxDecoration(
-                              color: statusPost == 'BELUM'
+                              color: statusPost == 'BELUM DIAMBIL'
                                   ? Colors.grey.shade100
                                   : Colors.green.shade50,
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              statusPost == 'BELUM' ? '-' : '$nilaiPost',
+                              statusPost == 'BELUM DIAMBIL'
+                                  ? '-'
+                                  : '$nilaiPost',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
-                                  color: statusPost == 'BELUM'
+                                  color: statusPost == 'BELUM DIAMBIL'
                                       ? Colors.grey
                                       : Colors.green.shade700),
                             ),
@@ -330,9 +319,9 @@ class HasilPretestPage extends StatelessWidget {
         if (snapshot.hasData && snapshot.data!.exists) {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           nilaiPretest = data['nilai_pretest'] ?? 0;
-          nilaiPosttest = data['nilai_postest'] ?? 0;
+          nilaiPosttest = data['nilai_posttest'] ?? 0;
           statusPre = data['status_pretest'] ?? 'BELUM DIAMBIL';
-          statusPost = data['status_postest'] ?? 'BELUM DIAMBIL';
+          statusPost = data['status_posttest'] ?? 'BELUM DIAMBIL';
         }
 
         bool sudahKeduanya =

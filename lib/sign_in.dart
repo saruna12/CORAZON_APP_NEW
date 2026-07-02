@@ -66,8 +66,8 @@ class _SignInPageState extends State<SignInPage> {
           if (!data.containsKey('status_pretest')) {
             updateData['status_pretest'] = 'BELUM DIAMBIL';
           }
-          if (!data.containsKey('status_postest')) {
-            updateData['status_postest'] = 'BELUM DIAMBIL';
+          if (!data.containsKey('status_posttest')) {
+            updateData['status_posttest'] = 'BELUM DIAMBIL';
           }
           if (updateData.isNotEmpty) {
             await FirebaseFirestore.instance
@@ -165,7 +165,7 @@ class _SignInPageState extends State<SignInPage> {
                 children: [
                   const SizedBox(height: 10),
                   const Text(
-                    'Email / Username Staf',
+                    'Email Pengguna',
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w500,
