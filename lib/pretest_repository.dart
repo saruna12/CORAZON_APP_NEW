@@ -3,17 +3,22 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class PretestRepository {
   // 📡 Pemantau Status Live Pretest & Posttest
-  static final ValueNotifier<bool> statusPretestLive = ValueNotifier<bool>(false);
-  static final ValueNotifier<String> kunciPretestLive = ValueNotifier<String>("");
+  static final ValueNotifier<bool> statusPretestLive =
+      ValueNotifier<bool>(false);
+  static final ValueNotifier<String> kunciPretestLive =
+      ValueNotifier<String>("");
 
-  static final ValueNotifier<bool> statusPosttestLive = ValueNotifier<bool>(false);
-  static final ValueNotifier<String> kunciPosttestLive = ValueNotifier<String>("");
+  static final ValueNotifier<bool> statusPosttestLive =
+      ValueNotifier<bool>(false);
+  static final ValueNotifier<String> kunciPosttestLive =
+      ValueNotifier<String>("");
 
   // ValueNotifier kompatibilitas lama
   static final ValueNotifier<bool> statusUjianLive = statusPretestLive;
 
   // 1. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian & Token Pretest di Firestore
-  static Future<void> ubahStatusUjian(bool statusBaru, {String? kunciAkses}) async {
+  static Future<void> ubahStatusUjian(bool statusBaru,
+      {String? kunciAkses}) async {
     try {
       Map<String, dynamic> data = {
         'is_aktif': statusBaru,
@@ -38,7 +43,8 @@ class PretestRepository {
   }
 
   // 1b. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian & Token Posttest di Firestore
-  static Future<void> ubahStatusPosttest(bool statusBaru, {String? kunciAkses}) async {
+  static Future<void> ubahStatusPosttest(bool statusBaru,
+      {String? kunciAkses}) async {
     try {
       Map<String, dynamic> data = {
         'is_aktif': statusBaru,
@@ -96,12 +102,14 @@ class PretestRepository {
     required String userId,
     required int nilai,
     required String status,
+    int? durasiDetik, // ✅ TAMBAHAN: durasi pengerjaan pretest (opsional)
   }) async {
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).set({
         'nilai_pretest': nilai,
         'status_pretest': status,
         'waktu_pretest': FieldValue.serverTimestamp(),
+        if (durasiDetik != null) 'durasi_pretest': durasiDetik,
       }, SetOptions(merge: true));
 
       debugPrint("Nilai pretest mahasiswa $userId berhasil direkam!");
@@ -115,12 +123,14 @@ class PretestRepository {
     required String userId,
     required int nilai,
     required String status,
+    int? durasiDetik, // ✅ TAMBAHAN: durasi pengerjaan posttest (opsional)
   }) async {
     try {
       await FirebaseFirestore.instance.collection('users').doc(userId).set({
         'nilai_posttest': nilai,
         'status_posttest': status,
         'waktu_posttest': FieldValue.serverTimestamp(),
+        if (durasiDetik != null) 'durasi_posttest': durasiDetik,
       }, SetOptions(merge: true));
 
       debugPrint("Nilai posttest mahasiswa $userId berhasil direkam!");

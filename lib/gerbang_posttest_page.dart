@@ -12,19 +12,11 @@ class GerbangPosttestPage extends StatefulWidget {
 
 class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
   final Color maroonPrimary = const Color(0xFF6B1D2F);
-  final TextEditingController _tokenController = TextEditingController();
-  bool _isTokenValid = false;
 
   @override
   void initState() {
     super.initState();
     PretestRepository.listenStatusUjian();
-  }
-
-  @override
-  void dispose() {
-    _tokenController.dispose();
-    super.dispose();
   }
 
   @override
@@ -42,7 +34,8 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
         elevation: 0,
       ),
       body: ValueListenableBuilder<bool>(
-        valueListenable: PretestRepository.statusPosttestLive, // ✅ pakai notifier postest terpusat
+        valueListenable: PretestRepository
+            .statusPosttestLive, // ✅ pakai notifier postest terpusat
         builder: (context, isOpen, child) {
           if (!isOpen) {
             return _buildScreenTerkunci();
@@ -117,30 +110,10 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
               const Divider(),
               const SizedBox(height: 12),
               _buildInfoRow(
-                  Icons.timer_rounded, 'Durasi Pengerjaan', '3 Menit'),
+                  Icons.timer_rounded, 'Durasi Pengerjaan', '25 Detik'),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.rule_rounded, 'Batas Kelulusan',
                   'Minimal Skor 60'), // ✅ fix: 60 bukan 70
-              // INPUT TOKEN/KUNCI AKSES
-              TextField(
-                controller: _tokenController,
-                onChanged: (val) {
-                  setState(() {
-                    _isTokenValid = val.trim() == PretestRepository.kunciPosttestLive.value;
-                  });
-                },
-                decoration: InputDecoration(
-                  labelText: 'Masukkan Kunci Akses (Token)',
-                  hintText: 'Hubungi dosen/laboran untuk token post-test',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  prefixIcon: const Icon(Icons.key),
-                  suffixIcon: _isTokenValid
-                      ? const Icon(Icons.check_circle, color: Colors.green)
-                      : null,
-                ),
-              ),
               const SizedBox(height: 24),
 
               if (userId.isEmpty) ...[
@@ -172,13 +145,13 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
                     backgroundColor:
-                        (userId.isEmpty || !_isTokenValid) ? Colors.grey : maroonPrimary,
+                        userId.isEmpty ? Colors.grey : maroonPrimary,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(14)),
                     elevation: 0,
                   ),
-                  onPressed: (userId.isEmpty || !_isTokenValid)
+                  onPressed: userId.isEmpty
                       ? null
                       : () {
                           Navigator.pushReplacement(

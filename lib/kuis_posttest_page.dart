@@ -3,42 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'pretest_repository.dart'; // ✅ Pakai repository yang sama dengan pretest
 
-// Kontrol akses posttest pakai dokumen SENDIRI di Firestore: kontrol_posttest
-// Tapi simpan hasil tetap lewat PretestRepository.simpanHasilPosttest()
-
-// Listener status posttest (terpisah dari pretest)
-class PosttestController {
-  static final ValueNotifier<bool> statusPosttestLive =
-      ValueNotifier<bool>(false);
-
-  static void listenStatusPosttest() {
-    FirebaseFirestore.instance
-        .collection('bank_soal')
-        .doc('kontrol_posttest')
-        .snapshots()
-        .listen((snapshot) {
-      if (snapshot.exists && snapshot.data() != null) {
-        var data = snapshot.data() as Map<String, dynamic>;
-        statusPosttestLive.value = data['is_aktif'] ?? false;
-      }
-    });
-  }
-
-  static Future<void> ubahStatusPosttest(bool statusBaru) async {
-    try {
-      await FirebaseFirestore.instance
-          .collection('bank_soal')
-          .doc('kontrol_posttest')
-          .set({
-        'is_aktif': statusBaru,
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      statusPosttestLive.value = statusBaru;
-    } catch (e) {
-      debugPrint("Gagal mengubah status akses posttest: $e");
-    }
-  }
-}
+// Kontrol akses posttest sekarang satu sumber lewat PretestRepository
+// (statusPosttestLive), supaya sinkron dengan gerbang_posttest_page.dart
+// dan tidak ada duplikasi listener status.
 
 class KuisPosttestPage extends StatefulWidget {
   final String userId;
@@ -58,12 +25,13 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
   final Map<int, int> _jawabanMahasiswa = {};
 
   Timer? _timer;
-  int _waktuTersisa = 600; // 10 Menit
+  int _waktuTersisa = 0; // akan di-set otomatis: jumlah soal x 5 detik
+  int _totalWaktuAwal = 0; // ✅ TAMBAHAN: untuk hitung durasi pengerjaan
 
   @override
   void initState() {
     super.initState();
-    PosttestController.listenStatusPosttest();
+    PretestRepository.listenStatusUjian();
     _muatSoalDanMulaiTimer();
   }
 
@@ -85,6 +53,8 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
         if (mounted) {
           setState(() {
             _daftarSoal = listAcak.take(5).toList();
+            _waktuTersisa = _daftarSoal.length * 5; // 5 detik per soal
+            _totalWaktuAwal = _waktuTersisa; // ✅ TAMBAHAN: simpan total awal
             _isLoading = false;
           });
         }
@@ -144,13 +114,18 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
         ? ((jumlahBenar / _daftarSoal.length) * 100).round()
         : 0;
 
-    String statusKelulusan = totalNilai >= 70 ? 'LULUS' : 'TIDAK LULUS';
+    String statusKelulusan = totalNilai >= 60 ? 'LULUS' : 'TIDAK LULUS';
 
-    // ✅ Simpan via PretestRepository → field nilai_postest & status_postest
+    // ✅ TAMBAHAN: hitung durasi pengerjaan
+    int durasiDetik = _totalWaktuAwal - _waktuTersisa;
+    if (durasiDetik < 0) durasiDetik = 0;
+
+    // ✅ Simpan via PretestRepository → field nilai_posttest & status_posttest
     await PretestRepository.simpanHasilPosttest(
       userId: widget.userId,
       nilai: totalNilai,
       status: statusKelulusan,
+      durasiDetik: durasiDetik,
     );
 
     if (mounted) {
@@ -188,8 +163,8 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
-      valueListenable:
-          PosttestController.statusPosttestLive, // ✅ Pakai kontrol posttest
+      valueListenable: PretestRepository
+          .statusPosttestLive, // ✅ Satu sumber status dengan gerbang_posttest_page
       builder: (context, isLive, child) {
         if (!isLive) {
           return Scaffold(

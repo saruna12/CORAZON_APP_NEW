@@ -113,10 +113,10 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
               const Divider(),
               const SizedBox(height: 12),
               _buildInfoRow(
-                  Icons.timer_rounded, 'Durasi Pengerjaan', '10 Menit'),
+                  Icons.timer_rounded, 'Durasi Pengerjaan', '25 Detik'),
               const SizedBox(height: 8),
               _buildInfoRow(
-                  Icons.rule_rounded, 'Batas Kelulusan', 'Minimal Skor 70'),
+                  Icons.rule_rounded, 'Batas Kelulusan', 'Minimal Skor 60'),
               const SizedBox(height: 24),
               if (userId.isEmpty) ...[
                 Container(
