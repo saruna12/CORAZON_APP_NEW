@@ -20,8 +20,11 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
 
   bool _checkingAuthorization = true;
   bool _isAuthorized = false;
-  String _dosenNama = 'Dosen';
-  String _dosenNIP = 'NIP Tidak Terbaca';
+  String _dosenNama = 'Pengguna';
+  String _dosenNIP = 'NIP/NIM Tidak Terbaca';
+  // ✅ Simpan role aktual (aslab / dosen) supaya UI bisa menyesuaikan,
+  // terutama untuk menyembunyikan menu yang khusus dosen.
+  String _role = 'aslab';
 
   // Stream ringkasan cepat: dihitung dari collection users yang sama
   // dengan yang dipakai halaman "Pantau Perkembangan", supaya angkanya
@@ -55,21 +58,25 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
           ? (snapshot.data() as Map<String, dynamic>)['role']?.toString() ?? ''
           : '';
 
-      if (role.isEmpty || role == 'mahasiswa') {
+      // ✅ WHITELIST eksplisit: halaman ini cuma untuk 'aslab' dan 'dosen'.
+      // Kalau role kosong, typo, atau role lain yang tidak dikenal,
+      // otomatis DITOLAK (default deny) -- bukan otomatis diizinkan.
+      if (role != 'aslab' && role != 'dosen') {
         await FirebaseAuth.instance.signOut();
         _redirectToSignIn();
         return;
       }
 
-      // Ambil nama dan NIP dosen
+      // Ambil nama dan NIP/NIM pengguna (aslab atau dosen)
       if (snapshot.exists && snapshot.data() != null) {
         final data = snapshot.data() as Map<String, dynamic>;
-        _dosenNama = data['nama'] ?? 'Dosen';
-        _dosenNIP = data['nip'] ?? 'NIP Tidak Terbaca';
+        _dosenNama = data['nama'] ?? 'Pengguna';
+        _dosenNIP = data['nip'] ?? 'NIP/NIM Tidak Terbaca';
       }
 
       if (mounted) {
         setState(() {
+          _role = role; // simpan role aktual untuk gating menu di UI
           _isAuthorized = true;
           _checkingAuthorization = false;
         });
@@ -152,6 +159,14 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                             fontSize: 22,
                             fontWeight: FontWeight.bold),
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _role == 'dosen' ? 'Dosen' : 'Asisten Laboratorium',
+                        style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600),
+                      ),
                       const SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -195,7 +210,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                 children: [
                   // 1. RINGKASAN CEPAT
                   const Text(
-                    'DATA',
+                    'RINGKASAN',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -221,9 +236,9 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
 
                   const SizedBox(height: 24),
 
-                  // 3. MENU HARIAN (paling sering dipakai dosen)
+                  // 3. KONTEN PEMBELAJARAN (kelola modul & bank soal)
                   const Text(
-                    'MENU HARIAN',
+                    'KONTEN PEMBELAJARAN',
                     style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -261,7 +276,16 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
 
                   const SizedBox(height: 16),
 
-                  // 4. PANTAU HASIL (dinaikkan, paling sering dicek dosen)
+                  // 4. PEMANTAUAN (dinaikkan, paling sering dicek dosen)
+                  const Text(
+                    'PEMANTAUAN',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.grey,
+                        letterSpacing: 1.0),
+                  ),
+                  const SizedBox(height: 12),
                   _buildFullWidthMenu(
                     context: context,
                     title: 'Pantau Perkembangan & Hasil Ujian',
@@ -273,25 +297,29 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
 
                   const SizedBox(height: 16),
 
-                  // 5. MANAJEMEN PENGGUNA (diturunkan, jarang dipakai)
-                  const Text(
-                    'ADMINISTRASI',
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.grey,
-                        letterSpacing: 1.0),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildFullWidthMenu(
-                    context: context,
-                    title: 'Manajemen Pengguna',
-                    subtitle: 'Ubah role / hapus user',
-                    icon: Icons.supervised_user_circle_rounded,
-                    iconColor: Colors.grey.shade500,
-                    targetPage: const UserManagementPage(),
-                    muted: true,
-                  ),
+                  // 5. MANAJEMEN PENGGUNA — HANYA untuk dosen.
+                  // Aslab TIDAK diberi menu ini sama sekali (bukan cuma
+                  // disembunyikan secara visual, tapi tidak dirender).
+                  if (_role == 'dosen') ...[
+                    const Text(
+                      'ADMINISTRASI',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.grey,
+                          letterSpacing: 1.0),
+                    ),
+                    const SizedBox(height: 12),
+                    _buildFullWidthMenu(
+                      context: context,
+                      title: 'Manajemen Pengguna',
+                      subtitle: 'Ubah role / hapus user',
+                      icon: Icons.supervised_user_circle_rounded,
+                      iconColor:
+                          const Color(0xFF801A24), // maroon, warna khas app
+                      targetPage: const UserManagementPage(),
+                    ),
+                  ],
                 ],
               ),
             ),

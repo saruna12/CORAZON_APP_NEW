@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart'; // ✅ Untuk kIsWeb
 import 'package:firebase_core/firebase_core.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'splash_screen.dart';
 import 'pretest_repository.dart';
 
@@ -41,23 +40,16 @@ void main() async {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  Future<void> jalankanTesFirebase() async {
-    try {
-      await FirebaseFirestore.instance.collection('users').add({
-        'status_koneksi': 'Berhasil Terhubung!',
-        'nama_aplikasi': 'Corazon Clean App',
-        'waktu_tes': DateTime.now().toString(),
-      });
-      debugPrint("===== KONEKSI FIRESTORE BERHASIL =====");
-    } catch (e) {
-      debugPrint("===== KONEKSI FIRESTORE GAGAL: $e =====");
-    }
-  }
+  // ❌ DIHAPUS: jalankanTesFirebase() sebelumnya dipanggil di dalam
+  // build(), padahal build() bisa terpanggil berkali-kali (rotate layar,
+  // rebuild widget, dsb). Setiap kali itu terjadi, kode lama menambah
+  // 1 dokumen sampah baru ke collection 'users' -- collection yang sama
+  // dipakai untuk menyimpan data role mahasiswa/aslab/dosen. Dokumen
+  // sampah ini tidak punya field 'role', sehingga bisa mengacaukan query
+  // di UserManagementPage dan perhitungan ringkasan di DosenBerandaPage.
 
   @override
   Widget build(BuildContext context) {
-    jalankanTesFirebase();
-
     return MaterialApp(
       title: 'Corazon App',
       debugShowCheckedModeBanner: false,
