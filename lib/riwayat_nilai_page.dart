@@ -153,7 +153,7 @@ class RiwayatNilaiPage extends StatelessWidget {
                           rows:
                               List<DataRow>.generate(gabungan.length, (index) {
                             final item = gabungan[index];
-                            final bool lulus = item['status'] == 'LULUS';
+                            final bool selesai = item['status'] == 'SELESAI';
                             return DataRow(cells: [
                               DataCell(Text('${index + 1}')),
                               DataCell(Text(item['jenis'])),
@@ -166,7 +166,7 @@ class RiwayatNilaiPage extends StatelessWidget {
                               DataCell(Text(
                                 item['status'],
                                 style: TextStyle(
-                                  color: lulus ? Colors.green : Colors.red,
+                                  color: selesai ? Colors.green : Colors.grey,
                                   fontWeight: FontWeight.bold,
                                 ),
                               )),

@@ -4,8 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'sign_in.dart';
 import 'dosen/modul_page.dart';
 import 'gerbang_ujian_page.dart';
-import 'gerbang_posttest_page.dart'; // ✅ Tetap dipertahankan stuy
-import 'riwayat_nilai_page.dart'; // ✅ TAMBAHAN: tabel riwayat nilai saat card diklik
+import 'gerbang_posttest_page.dart';
 
 class BerandaPage extends StatefulWidget {
   final String namaMahasiswa;
@@ -31,11 +30,6 @@ class _BerandaPageState extends State<BerandaPage> {
   bool isLoading = true;
   bool _checkingAuthorization = true;
   bool _isAuthorized = false;
-
-  int skorPretest = 0;
-  String statusPretest = "BELUM DIAMBIL";
-  int skorPostest = 0;
-  String statusPostest = "BELUM DIAMBIL";
 
   @override
   void initState() {
@@ -108,11 +102,6 @@ class _BerandaPageState extends State<BerandaPage> {
             setState(() {
               namaTampil = data['nama'] ?? widget.namaMahasiswa;
               npmTampil = data['npm'] ?? widget.npmMahasiswa;
-
-              skorPretest = data['nilai_pretest'] ?? 0;
-              statusPretest = data['status_pretest'] ?? "BELUM DIAMBIL";
-              skorPostest = data['nilai_posttest'] ?? 0;
-              statusPostest = data['status_posttest'] ?? "BELUM DIAMBIL";
 
               isLoading = false;
             });
@@ -374,7 +363,7 @@ class _BerandaPageState extends State<BerandaPage> {
             ),
             const SizedBox(height: 16),
 
-            // 🚨 MODIFIKASI DISINI STUY - KELOMPOK CARD PRETEST 🚨
+            // 🚨 MODIFIKASI DISINI - KELOMPOK CARD PRETEST 🚨
             _buildCustomCard(
               title: 'PRETEST',
               child: Column(
@@ -394,7 +383,7 @@ class _BerandaPageState extends State<BerandaPage> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          "Pretest Syarat Masuk Lab",
+                          "Pengukuran Kompetensi awal",
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -417,19 +406,12 @@ class _BerandaPageState extends State<BerandaPage> {
                       );
                     },
                   ),
-                  const SizedBox(height: 6),
-                  Center(
-                    child: Text(
-                      'Batas kelulusan minimal skor: 60',
-                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                    ),
-                  ),
                 ],
               ),
             ),
             const SizedBox(height: 16),
             _buildCustomCard(
-              title: 'POSTEST',
+              title: 'POSTTEST',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -448,7 +430,7 @@ class _BerandaPageState extends State<BerandaPage> {
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
-                          'Postest Pembelajaran',
+                          'Pengukuran Kompetensi Akhir',
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
@@ -468,73 +450,6 @@ class _BerandaPageState extends State<BerandaPage> {
                         ),
                       );
                     },
-                  ),
-                  const SizedBox(height: 6),
-                  Center(
-                    child: Text(
-                      'Batas kelulusan minimal skor: 60',
-                      style: TextStyle(color: Colors.grey[700], fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _buildCustomCard(
-              title: 'DASHBOARD KEMAMPUAN',
-              titleAlign: TextAlign.center,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildProgressCard(
-                      title: 'PRETEST HASIL',
-                      subtitle: 'Skor Pretest Terbaik',
-                      status: statusPretest,
-                      statusColor: statusPretest == 'LULUS'
-                          ? Colors.green
-                          : (statusPretest == 'TIDAK LULUS'
-                              ? Colors.red
-                              : textDark),
-                      progressValue: skorPretest / 100,
-                      progressText: statusPretest == 'BELUM DIAMBIL'
-                          ? '-'
-                          : '$skorPretest',
-                      // ✅ TAMBAHAN: klik card buka halaman detail nilai (pretest & postest)
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RiwayatNilaiPage(),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildProgressCard(
-                      title: 'POSTEST HASIL',
-                      subtitle: 'Skor Postest Terbaik',
-                      status: statusPostest,
-                      statusColor: statusPostest == 'LULUS'
-                          ? Colors.green
-                          : (statusPostest == 'TIDAK LULUS'
-                              ? Colors.red
-                              : textDark),
-                      progressValue: skorPostest / 100,
-                      progressText: statusPostest == 'BELUM DIAMBIL'
-                          ? '-'
-                          : '$skorPostest',
-                      // ✅ TAMBAHAN: klik card buka halaman detail nilai (pretest & postest)
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RiwayatNilaiPage(),
-                          ),
-                        );
-                      },
-                    ),
                   ),
                 ],
               ),
@@ -628,84 +543,6 @@ class _BerandaPageState extends State<BerandaPage> {
           text,
           style:
               const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProgressCard({
-    required String title,
-    required String subtitle,
-    required String status,
-    required Color statusColor,
-    required double progressValue,
-    required String progressText,
-    VoidCallback?
-        onTap, // ✅ TAMBAHAN: opsional, tidak mengubah pemanggilan lama
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(title,
-                style:
-                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 11),
-                textAlign: TextAlign.center),
-            Text(subtitle,
-                style: TextStyle(color: Colors.grey[600], fontSize: 9),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 14),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                SizedBox(
-                  width: 65,
-                  height: 65,
-                  child: CircularProgressIndicator(
-                    value: progressValue == 0.0 ? 1.0 : progressValue,
-                    strokeWidth: 6,
-                    backgroundColor: const Color(0xFFEFEFEF),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      progressValue == 0.0
-                          ? const Color(0xFFDCDCDC)
-                          : maroonPrimary,
-                    ),
-                  ),
-                ),
-                Text(
-                  progressText,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('Status: ',
-                    style: TextStyle(fontSize: 10, color: Colors.grey)),
-                Flexible(
-                  child: Text(
-                    status,
-                    style: TextStyle(
-                        fontSize: 9,
-                        fontWeight: FontWeight.bold,
-                        color: statusColor),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );

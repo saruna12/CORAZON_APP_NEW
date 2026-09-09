@@ -7,6 +7,7 @@ import 'modul_page.dart';
 import 'bank_soal_page.dart';
 import 'hasil_pretest_page.dart';
 import 'user_management_page.dart';
+import 'mahasiswa_belum_ujian_page.dart';
 
 class DosenBerandaPage extends StatefulWidget {
   const DosenBerandaPage({super.key});
@@ -161,7 +162,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        _role == 'dosen' ? 'Dosen' : 'Asisten Laboratorium',
+                        _role == 'Pengelola laboratorium' ? '' : '',
                         style: const TextStyle(
                             color: Colors.white60,
                             fontSize: 11,
@@ -289,7 +290,7 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                   _buildFullWidthMenu(
                     context: context,
                     title: 'Pantau Perkembangan & Hasil Ujian',
-                    subtitle: 'Rekap skor & status kelulusan mahasiswa',
+                    subtitle: 'Rekap skor & status pengerjaan mahasiswa',
                     icon: Icons.analytics_rounded,
                     iconColor: const Color(0xFF2ECC71),
                     targetPage: const HasilPretestPage(isDosen: true),
@@ -369,6 +370,15 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
               child: _buildStatCard(
                 value: isLoading ? '-' : '$selesaiPretest/$total',
                 label: 'pretest',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MahasiswaBelumUjianPage(
+                      jenisUjian: 'Pretest',
+                      statusField: 'status_pretest',
+                    ),
+                  ),
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -376,6 +386,15 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
               child: _buildStatCard(
                 value: isLoading ? '-' : '$selesaiPosttest/$total',
                 label: 'posttest',
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const MahasiswaBelumUjianPage(
+                      jenisUjian: 'Posttest',
+                      statusField: 'status_posttest',
+                    ),
+                  ),
+                ),
               ),
             ),
           ],
@@ -384,32 +403,40 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
     );
   }
 
-  Widget _buildStatCard({required String value, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
-          ),
-        ],
+  Widget _buildStatCard({
+    required String value,
+    required String label,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 12,
+              offset: const Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+            ),
+          ],
+        ),
       ),
     );
   }

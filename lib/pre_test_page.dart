@@ -56,10 +56,33 @@ class _PretestPageState extends State<PretestPage> {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
-                  Text(
-                    "Kuis ini terdiri dari 5 soal acak yang dipilih langsung oleh sistem. Waktu pengerjaan adalah 10 menit.",
-                    style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
-                    textAlign: TextAlign.center,
+                  FutureBuilder<int>(
+                    future: PretestRepository.hitungDurasiPretestDetik(),
+                    builder: (context, snap) {
+                      String durasiText = 'Waktu pengerjaan akan ditentukan';
+                      if (snap.connectionState == ConnectionState.waiting) {
+                        durasiText = 'Memuat informasi durasi...';
+                      } else if (snap.hasError) {
+                        durasiText = 'Waktu pengerjaan: 30 Detik';
+                      } else if (snap.hasData) {
+                        final detik = snap.data ?? 0;
+                        if (detik < 60) {
+                          durasiText = 'Waktu pengerjaan adalah $detik Detik.';
+                        } else {
+                          final menit = detik ~/ 60;
+                          final sisa = detik % 60;
+                          durasiText =
+                              'Waktu pengerjaan adalah ${menit}m ${sisa}s.';
+                        }
+                      }
+
+                      return Text(
+                        "Kuis ini terdiri dari 5 soal acak yang dipilih langsung oleh sistem. $durasiText",
+                        style: TextStyle(
+                            fontSize: 14, color: Colors.grey.shade600),
+                        textAlign: TextAlign.center,
+                      );
+                    },
                   ),
                   const SizedBox(height: 8),
 
@@ -114,7 +137,6 @@ class _PretestPageState extends State<PretestPage> {
 
                   const SizedBox(height: 24),
 
-                  // 📡 Memantau status LIVE ujian secara real-time dari repository
                   ValueListenableBuilder<bool>(
                     valueListenable: PretestRepository.statusUjianLive,
                     builder: (context, isLive, child) {

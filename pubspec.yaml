@@ -16,7 +16,7 @@ dependencies:
   firebase_auth: ^6.5.3
   firebase_storage: ^13.4.3
   
-  # Tambahan library untuk import Excel (Web Admin) stuy
+  # Tambahan library untuk import Excel (Web Admin)
   file_picker: ^11.0.2
   excel: ^4.0.6
   url_launcher: ^6.3.2
@@ -29,6 +29,6 @@ dev_dependencies:
 flutter:
   uses-material-design: true
 
-  # Pendaftaran folder assets gambar kamu stuy
+  # Pendaftaran folder assets gambar kamu
   assets:
     - assets/images/

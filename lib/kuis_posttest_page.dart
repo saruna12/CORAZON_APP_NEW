@@ -15,7 +15,8 @@ class KuisPosttestPage extends StatefulWidget {
   State<KuisPosttestPage> createState() => _KuisPosttestPageState();
 }
 
-class _KuisPosttestPageState extends State<KuisPosttestPage> {
+class _KuisPosttestPageState extends State<KuisPosttestPage>
+    with WidgetsBindingObserver {
   final Color maroonPrimary = const Color(0xFF6B1D2F);
   final Color textDark = const Color(0xFF2C2C2C);
 
@@ -23,24 +24,31 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
   bool _isLoading = true;
   int _currentIndex = 0;
   final Map<int, int> _jawabanMahasiswa = {};
+  final Map<int, List<String>> _opsiAcak = {};
+  final Map<int, int> _jawabanBenarAcak = {};
 
   Timer? _timer;
-  int _waktuTersisa = 0; // akan di-set otomatis: jumlah soal x 5 detik
+  static const int _batasWaktuDetik = 30;
+  int _waktuTersisa = 0;
   int _totalWaktuAwal = 0; // ✅ TAMBAHAN: untuk hitung durasi pengerjaan
+  DateTime? _waktuMulai;
+  bool _sedangMengirim = false;
+  bool _sudahBerakhir = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     PretestRepository.listenStatusUjian();
     _muatSoalDanMulaiTimer();
   }
 
-  // ✅ Soal diambil dari bank soal PRETEST (sama)
+  // Soal posttest diambil dari bank soal posttest secara acak.
   void _muatSoalDanMulaiTimer() async {
     try {
       var querySnapshot = await FirebaseFirestore.instance
           .collection('bank_soal')
-          .doc('paket_utama_pretest') // ✅ Sama dengan pretest
+          .doc('paket_utama_posttest')
           .collection('daftar_soal')
           .get();
 
@@ -51,14 +59,16 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
         listAcak.shuffle(); // Acak soal biar beda urutannya dari pretest
 
         if (mounted) {
+          final soalTerpilih = listAcak.take(5).toList();
+          _siapkanOpsiAcak(soalTerpilih);
           setState(() {
-            _daftarSoal = listAcak.take(5).toList();
-            _waktuTersisa = _daftarSoal.length * 5; // 5 detik per soal
-            _totalWaktuAwal = _waktuTersisa; // ✅ TAMBAHAN: simpan total awal
-            _isLoading = false;
+            _daftarSoal = soalTerpilih;
           });
         }
-        _mulaiTimerMundur();
+        await _mulaiAtauPulihkanTimer();
+        if (mounted && !_sudahBerakhir) {
+          setState(() => _isLoading = false);
+        }
       } else {
         if (mounted) {
           setState(() {
@@ -76,18 +86,65 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
     }
   }
 
+  void _siapkanOpsiAcak(List<DocumentSnapshot> soal) {
+    for (int soalIndex = 0; soalIndex < soal.length; soalIndex++) {
+      final data = soal[soalIndex].data() as Map<String, dynamic>;
+      final opsiAsli = List<String>.from(data['opsi'] ?? []);
+      final urutan = List<int>.generate(opsiAsli.length, (index) => index)
+        ..shuffle();
+      _opsiAcak[soalIndex] = [for (final index in urutan) opsiAsli[index]];
+      _jawabanBenarAcak[soalIndex] =
+          urutan.indexOf((data['jawaban_benar'] as num?)?.toInt() ?? 0);
+    }
+  }
+
+  Future<void> _mulaiAtauPulihkanTimer() async {
+    final userRef =
+        FirebaseFirestore.instance.collection('users').doc(widget.userId);
+    final snapshot = await userRef.get();
+    final data = snapshot.data();
+    final waktuTersimpan = data?['waktu_mulai_posttest'] as Timestamp?;
+    final waktuMulai = waktuTersimpan?.toDate() ?? DateTime.now();
+
+    if (waktuTersimpan == null) {
+      await userRef.set({
+        'waktu_mulai_posttest': Timestamp.fromDate(waktuMulai),
+      }, SetOptions(merge: true));
+    }
+
+    _waktuMulai = waktuMulai;
+    _totalWaktuAwal = _batasWaktuDetik;
+    _perbaruiWaktuDariJam();
+    if (!_sudahBerakhir) {
+      _mulaiTimerMundur();
+    }
+  }
+
+  void _perbaruiWaktuDariJam() {
+    if (_waktuMulai == null || _sudahBerakhir) return;
+    final elapsed = DateTime.now().difference(_waktuMulai!).inSeconds;
+    final tersisa = _batasWaktuDetik - elapsed;
+    if (tersisa <= 0) {
+      _waktuTersisa = 0;
+      _timer?.cancel();
+      _handleWaktuHabis();
+      return;
+    }
+    if (mounted) {
+      setState(() => _waktuTersisa = tersisa);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _perbaruiWaktuDariJam();
+    }
+  }
+
   void _mulaiTimerMundur() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_waktuTersisa > 0) {
-        if (mounted) {
-          setState(() {
-            _waktuTersisa--;
-          });
-        }
-      } else {
-        _timer?.cancel();
-        _submitKuisOtomatis();
-      }
+      _perbaruiWaktuDariJam();
     });
   }
 
@@ -97,13 +154,43 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
     return '${menit.toString().padLeft(2, '0')}:${detik.toString().padLeft(2, '0')}';
   }
 
-  void _submitKuisOtomatis() async {
+  Future<void> _handleWaktuHabis() async {
+    if (_sudahBerakhir || _sedangMengirim) return;
+    _sudahBerakhir = true;
+    await _hapusWaktuMulai();
+
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text('Waktu Habis'),
+        content: const Text(
+            'Waktu 30 detik telah habis. Jawaban tidak dihitung dan sesi ini tetap dianggap belum mengerjakan posttest.'),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: maroonPrimary),
+            onPressed: () {
+              Navigator.pop(context);
+              Navigator.pop(context);
+            },
+            child: const Text('Kembali', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _submitKuisManual() async {
+    if (_sudahBerakhir || _sedangMengirim) return;
+    _perbaruiWaktuDariJam();
+    if (_sudahBerakhir) return;
+    _sedangMengirim = true;
     _timer?.cancel();
 
     int jumlahBenar = 0;
     for (int i = 0; i < _daftarSoal.length; i++) {
-      var dataSoal = _daftarSoal[i].data() as Map<String, dynamic>;
-      int jawabanBenar = dataSoal['jawaban_benar'] ?? 0;
+      int jawabanBenar = _jawabanBenarAcak[i] ?? 0;
       int? jawabanMhs = _jawabanMahasiswa[i];
       if (jawabanMhs != null && jawabanMhs == jawabanBenar) {
         jumlahBenar++;
@@ -114,19 +201,30 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
         ? ((jumlahBenar / _daftarSoal.length) * 100).round()
         : 0;
 
-    String statusKelulusan = totalNilai >= 60 ? 'LULUS' : 'TIDAK LULUS';
+    const String statusHasil = 'SELESAI';
 
     // ✅ TAMBAHAN: hitung durasi pengerjaan
     int durasiDetik = _totalWaktuAwal - _waktuTersisa;
     if (durasiDetik < 0) durasiDetik = 0;
 
     // ✅ Simpan via PretestRepository → field nilai_posttest & status_posttest
-    await PretestRepository.simpanHasilPosttest(
+    final berhasilDisimpan = await PretestRepository.simpanHasilPosttest(
       userId: widget.userId,
       nilai: totalNilai,
-      status: statusKelulusan,
+      status: statusHasil,
       durasiDetik: durasiDetik,
     );
+    if (!berhasilDisimpan) {
+      _sedangMengirim = false;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text('Nilai gagal disimpan. Silakan coba lagi.')),
+        );
+      }
+      return;
+    }
+    await _hapusWaktuMulai();
 
     if (mounted) {
       showDialog(
@@ -137,8 +235,13 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           title: const Text('Posttest Selesai!',
               style: TextStyle(fontWeight: FontWeight.bold)),
-          content: Text('Nilai kamu: $totalNilai\nStatus: $statusKelulusan.'),
+          content: Text(
+              'Nilai akhir: $totalNilai\nStatus jawaban: $jumlahBenar/${_daftarSoal.length}'),
           actions: [
+            TextButton(
+              onPressed: _tampilkanSoalSalah,
+              child: const Text('Review Ujian'),
+            ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(backgroundColor: maroonPrimary),
               onPressed: () {
@@ -146,7 +249,7 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                 Navigator.pop(context);
               },
               child:
-                  const Text('Kembali', style: TextStyle(color: Colors.white)),
+                  const Text('Selesai', style: TextStyle(color: Colors.white)),
             )
           ],
         ),
@@ -154,10 +257,91 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
     }
   }
 
+  void _tampilkanSoalSalah() {
+    var reviewIndex = 0;
+    showDialog<void>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final data = _daftarSoal[reviewIndex].data() as Map<String, dynamic>;
+          final opsi = _opsiAcak[reviewIndex] ?? <String>[];
+          final jawabanDipilih = _jawabanMahasiswa[reviewIndex];
+          final jawabanBenar = _jawabanBenarAcak[reviewIndex] ?? 0;
+          return AlertDialog(
+            title: Text('Review Soal ${reviewIndex + 1}/${_daftarSoal.length}'),
+            content: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('${data['pertanyaan'] ?? ''}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  for (int index = 0; index < opsi.length; index++)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: index == jawabanBenar
+                            ? Colors.green.shade50
+                            : index == jawabanDipilih
+                                ? Colors.red.shade50
+                                : Colors.grey.shade100,
+                        border: Border.all(
+                          color: index == jawabanBenar
+                              ? Colors.green
+                              : index == jawabanDipilih
+                                  ? Colors.red
+                                  : Colors.grey.shade300,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                          '${String.fromCharCode(65 + index)}. ${opsi[index]}'),
+                    ),
+                  const SizedBox(height: 4),
+                  Text('Jawaban benar: ${opsi[jawabanBenar]}',
+                      style: const TextStyle(
+                          color: Colors.green, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: reviewIndex == 0
+                    ? null
+                    : () => setDialogState(() => reviewIndex--),
+                child: const Text('Sebelumnya'),
+              ),
+              if (reviewIndex < _daftarSoal.length - 1)
+                TextButton(
+                  onPressed: () => setDialogState(() => reviewIndex++),
+                  child: const Text('Selanjutnya'),
+                )
+              else
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Selesai'),
+                ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   @override
   void dispose() {
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  Future<void> _hapusWaktuMulai() async {
+    await FirebaseFirestore.instance
+        .collection('users')
+        .doc(widget.userId)
+        .update({'waktu_mulai_posttest': FieldValue.delete()});
   }
 
   @override
@@ -244,17 +428,17 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
         var dataSoalSekarang =
             _daftarSoal[_currentIndex].data() as Map<String, dynamic>;
         String pertanyaan = dataSoalSekarang['pertanyaan'] ?? '';
-        List<String> opsi = List<String>.from(dataSoalSekarang['opsi'] ?? []);
+        List<String> opsi = _opsiAcak[_currentIndex] ?? [];
 
         return Scaffold(
           backgroundColor: const Color(0xFFF9F6F6),
           appBar: AppBar(
             title: Text(
-                'POSTTEST - SOAL ${_currentIndex + 1}/${_daftarSoal.length}',
+                'POSTTEST | SOAL ${_currentIndex + 1}/${_daftarSoal.length} | 30 DETIK',
                 style: const TextStyle(
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
-                    fontSize: 15)),
+                    fontSize: 13)),
             backgroundColor: maroonPrimary,
             automaticallyImplyLeading: false,
             actions: [
@@ -394,12 +578,20 @@ class _KuisPosttestPageState extends State<KuisPosttestPage> {
                       style: ElevatedButton.styleFrom(
                           backgroundColor: maroonPrimary),
                       onPressed: () {
+                        if (!_jawabanMahasiswa.containsKey(_currentIndex)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content:
+                                    Text('Pilih jawaban terlebih dahulu.')),
+                          );
+                          return;
+                        }
                         if (_currentIndex < _daftarSoal.length - 1) {
                           setState(() {
                             _currentIndex++;
                           });
                         } else {
-                          _submitKuisOtomatis();
+                          _submitKuisManual();
                         }
                       },
                       child: Text(

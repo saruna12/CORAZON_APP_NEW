@@ -98,7 +98,7 @@ class PretestRepository {
   }
 
   // 3. ✅ FIX: Simpan nilai ke users/{uid} agar beranda bisa baca langsung
-  static Future<void> simpanHasilPretest({
+  static Future<bool> simpanHasilPretest({
     required String userId,
     required int nilai,
     required String status,
@@ -113,13 +113,15 @@ class PretestRepository {
       }, SetOptions(merge: true));
 
       debugPrint("Nilai pretest mahasiswa $userId berhasil direkam!");
+      return true;
     } catch (e) {
       debugPrint("Gagal menyimpan nilai pretest ke database: $e");
+      return false;
     }
   }
 
   // 4. ✅ Simpan nilai posttest ke users/{uid} (menggunakan dua 't' secara standar)
-  static Future<void> simpanHasilPosttest({
+  static Future<bool> simpanHasilPosttest({
     required String userId,
     required int nilai,
     required String status,
@@ -134,8 +136,10 @@ class PretestRepository {
       }, SetOptions(merge: true));
 
       debugPrint("Nilai posttest mahasiswa $userId berhasil direkam!");
+      return true;
     } catch (e) {
       debugPrint("Gagal menyimpan nilai posttest ke database: $e");
+      return false;
     }
   }
 
@@ -201,5 +205,10 @@ class PretestRepository {
     } catch (e) {
       throw Exception(e.toString());
     }
+  }
+
+  // 6. Durasi tetap untuk satu sesi pretest.
+  static Future<int> hitungDurasiPretestDetik() async {
+    return 30;
   }
 }

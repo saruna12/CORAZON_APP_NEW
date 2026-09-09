@@ -56,7 +56,7 @@ class _PosttestPageState extends State<PosttestPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Kuis ini terdiri dari 5 soal acak yang dipilih langsung oleh sistem. Waktu pengerjaan adalah 10 menit.",
+                    "Kuis ini terdiri dari 5 soal acak yang dipilih langsung oleh sistem. Waktu pengerjaan adalah 30 detik.",
                     style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
                     textAlign: TextAlign.center,
                   ),

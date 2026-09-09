@@ -14,6 +14,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _npmController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _classCodeController = TextEditingController();
   bool _isLoading = false;
 
   @override
@@ -22,6 +23,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _npmController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _classCodeController.dispose();
     super.dispose();
   }
 
@@ -31,8 +33,13 @@ class _RegisterPageState extends State<RegisterPage> {
     String npm = _npmController.text.trim();
     String email = _emailController.text.trim();
     String password = _passwordController.text.trim();
+    String classCode = _classCodeController.text.trim();
 
-    if (name.isEmpty || npm.isEmpty || email.isEmpty || password.isEmpty) {
+    if (name.isEmpty ||
+        npm.isEmpty ||
+        email.isEmpty ||
+        password.isEmpty ||
+        classCode.isEmpty) {
       _showSnackbar('Semua kolom wajib diisi!');
       return;
     }
@@ -45,6 +52,23 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
+      final classSnapshot = await FirebaseFirestore.instance
+          .collection('class_settings')
+          .doc('app')
+          .get();
+      final classData = classSnapshot.data();
+      final activeCode = classData?['active_code']?.toString().trim();
+      final isActive = classData?['active'] != false;
+      if (!classSnapshot.exists ||
+          !isActive ||
+          activeCode == null ||
+          activeCode.isEmpty ||
+          activeCode.toLowerCase() != classCode.toLowerCase()) {
+        _showSnackbar('Kode kelas tidak valid atau sudah tidak aktif.');
+        return;
+      }
+
+      final classId = classData?['class_id']?.toString() ?? 'app';
       // 1. Daftarkan akun di Firebase Authentication
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
@@ -65,6 +89,8 @@ class _RegisterPageState extends State<RegisterPage> {
           'nip': npm,
           'email': email,
           'role': 'mahasiswa',
+          'class_id': classId,
+          'class_code': activeCode,
           'status_pretest': 'BELUM DIAMBIL',
           'status_posttest': 'BELUM DIAMBIL',
           'waktu_daftar': DateTime.now().toString(),
@@ -211,6 +237,24 @@ class _RegisterPageState extends State<RegisterPage> {
                       obscureText: true,
                       decoration: const InputDecoration(
                           border: InputBorder.none,
+                          contentPadding: EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 12)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text('Kode Kelas',
+                      style: TextStyle(fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 6),
+                  Container(
+                    decoration: BoxDecoration(
+                        color: const Color(0xFFE0E0E0),
+                        borderRadius: BorderRadius.circular(8.0)),
+                    child: TextField(
+                      controller: _classCodeController,
+                      textCapitalization: TextCapitalization.characters,
+                      decoration: const InputDecoration(
+                          border: InputBorder.none,
+                          hintText: 'Contoh: Anatomi2026',
                           contentPadding: EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12)),
                     ),

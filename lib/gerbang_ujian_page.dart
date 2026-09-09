@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'pretest_repository.dart';
 import 'kuis_pretest_page.dart';
+import 'kuis_posttest_page.dart';
 
 class GerbangUjianPage extends StatefulWidget {
   final bool isPretest;
@@ -38,7 +39,9 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
         elevation: 0,
       ),
       body: ValueListenableBuilder<bool>(
-        valueListenable: PretestRepository.statusUjianLive,
+        valueListenable: widget.isPretest
+            ? PretestRepository.statusPretestLive
+            : PretestRepository.statusPosttestLive,
         builder: (context, isOpen, child) {
           if (!isOpen) {
             return _buildScreenTerkunci();
@@ -112,11 +115,31 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
               const SizedBox(height: 16),
               const Divider(),
               const SizedBox(height: 12),
-              _buildInfoRow(
-                  Icons.timer_rounded, 'Durasi Pengerjaan', '25 Detik'),
+              FutureBuilder<int>(
+                future: PretestRepository.hitungDurasiPretestDetik(),
+                builder: (context, snap) {
+                  String teksDurasi = '—';
+                  if (snap.connectionState == ConnectionState.waiting) {
+                    teksDurasi = 'Memeriksa...';
+                  } else if (snap.hasError) {
+                    teksDurasi = '30 Detik';
+                  } else if (snap.hasData) {
+                    final detik = snap.data ?? 0;
+                    if (detik < 60) {
+                      teksDurasi = '$detik Detik';
+                    } else {
+                      final menit = detik ~/ 60;
+                      final sisa = detik % 60;
+                      teksDurasi = '${menit}m ${sisa}s';
+                    }
+                  }
+
+                  return _buildInfoRow(
+                      Icons.timer_rounded, 'Durasi Pengerjaan', teksDurasi);
+                },
+              ),
               const SizedBox(height: 8),
-              _buildInfoRow(
-                  Icons.rule_rounded, 'Batas Kelulusan', 'Minimal Skor 60'),
+              _buildInfoRow(Icons.quiz_rounded, 'Jumlah Soal', '5 Soal'),
               const SizedBox(height: 24),
               if (userId.isEmpty) ...[
                 Container(
@@ -159,8 +182,9 @@ class _GerbangUjianPageState extends State<GerbangUjianPage> {
                           Navigator.pushReplacement(
                             context,
                             MaterialPageRoute(
-                              builder: (context) =>
-                                  KuisPretestPage(userId: userId),
+                              builder: (context) => widget.isPretest
+                                  ? KuisPretestPage(userId: userId)
+                                  : KuisPosttestPage(userId: userId),
                             ),
                           );
                         },

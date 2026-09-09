@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'kuis_posttest_page.dart';
-import 'pretest_repository.dart'; // ✅ Import repository stuy
+import 'pretest_repository.dart'; // ✅ Import repository
 
 class GerbangPosttestPage extends StatefulWidget {
   const GerbangPosttestPage({super.key});
@@ -110,12 +110,10 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
               const Divider(),
               const SizedBox(height: 12),
               _buildInfoRow(
-                  Icons.timer_rounded, 'Durasi Pengerjaan', '25 Detik'),
+                  Icons.timer_rounded, 'Durasi Pengerjaan', '30 Detik'),
               const SizedBox(height: 8),
-              _buildInfoRow(Icons.rule_rounded, 'Batas Kelulusan',
-                  'Minimal Skor 60'), // ✅ fix: 60 bukan 70
+              _buildInfoRow(Icons.quiz_rounded, 'Jumlah Soal', '5 Soal'),
               const SizedBox(height: 24),
-
               if (userId.isEmpty) ...[
                 Container(
                   padding: const EdgeInsets.all(12),

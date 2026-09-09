@@ -58,7 +58,7 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
       if (result != null) {
         setState(() {
           _fileTerpilih = result.files.first;
-          _statusPesan = "File Posttest siap diimport stuy!";
+          _statusPesan = "File Posttest siap diimport !";
         });
       }
     } catch (e) {
@@ -106,7 +106,7 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
       var table = excel.tables[sheetName];
 
       if (table == null || table.maxRows <= 1) {
-        throw "File Excel kosong atau format tidak sesuai stuy.";
+        throw "File Excel kosong atau format tidak sesuai.";
       }
 
       int jumlahSoalBerhasil = 0;
@@ -254,7 +254,7 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
                         child: _isUploading
                             ? const CircularProgressIndicator(
                                 color: Colors.white)
-                            : const Text("Mulai Import ke Firebase stuy!",
+                            : const Text("Mulai Import ke Firebase !",
                                 style: TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.bold)),

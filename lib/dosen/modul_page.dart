@@ -27,7 +27,7 @@ class _ModulPageState extends State<ModulPage> {
   Future<void> _bukaLinkMateri(String urlString, BuildContext context) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
 
-    // Bersihkan spasi jika ada stuy
+    // Bersihkan spasi jika ada
     String formattedUrl = urlString.trim();
 
     if (formattedUrl.isEmpty) return;
@@ -50,8 +50,7 @@ class _ModulPageState extends State<ModulPage> {
       } else {
         messenger.showSnackBar(
           const SnackBar(
-              content:
-                  Text('Format link tidak valid atau tidak bisa dibuka stuy!')),
+              content: Text('Format link tidak valid atau tidak bisa dibuka!')),
         );
       }
     } catch (e) {
@@ -142,8 +141,7 @@ class _ModulPageState extends State<ModulPage> {
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text("Hapus Modul"),
-        content:
-            const Text("Apakah kamu yakin ingin menghapus modul ini stuy?"),
+        content: const Text("Apakah kamu yakin ingin menghapus modul ini?"),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(dialogContext),
@@ -223,8 +221,8 @@ class _ModulPageState extends State<ModulPage> {
                     const SizedBox(height: 8),
                     Text(
                       bolehMengelola
-                          ? "Halo Admin/Dosen, silakan klik tombol '+' di kanan bawah untuk meng-input modul materi kuliah pertama stuy!"
-                          : "Dosen atau Laboran belum meng-upload materi kuliah. Harap tunggu atau hubungi tim akademis ya stuy!",
+                          ? "Halo Admin/Dosen, silakan klik tombol '+' di kanan bawah untuk meng-input modul materi kuliah pertama !"
+                          : "Dosen atau Laboran belum meng-upload materi kuliah. Harap tunggu atau hubungi tim akademis ya !",
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.grey, fontSize: 14),
                     ),

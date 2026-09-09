@@ -50,33 +50,44 @@ class _SignInPageState extends State<SignInPage> {
         DocumentSnapshot userDoc =
             await FirebaseFirestore.instance.collection('users').doc(uid).get();
 
-        String role = 'mahasiswa';
-        String namaMhs = 'Mahasiswa';
-        Map<String, dynamic> data = {};
-        if (userDoc.exists && userDoc.data() != null) {
-          data = userDoc.data() as Map<String, dynamic>;
-          role = data['role'] ?? 'mahasiswa';
-          namaMhs = data['nama'] ?? namaMhs;
-
-          // Perbaiki data pengguna jika field penting belum ada
-          final updateData = <String, Object>{};
-          if (!data.containsKey('role')) {
-            updateData['role'] = 'mahasiswa';
-          }
-          if (!data.containsKey('status_pretest')) {
-            updateData['status_pretest'] = 'BELUM DIAMBIL';
-          }
-          if (!data.containsKey('status_posttest')) {
-            updateData['status_posttest'] = 'BELUM DIAMBIL';
-          }
-          if (updateData.isNotEmpty) {
-            await FirebaseFirestore.instance
-                .collection('users')
-                .doc(uid)
-                .set(updateData, SetOptions(merge: true));
-          }
+        if (!userDoc.exists || userDoc.data() == null) {
+          await FirebaseAuth.instance.signOut();
+          _showSnackbar('Akses ditolak. Akun belum terdaftar di aplikasi.');
+          return;
         }
 
+        final data = userDoc.data() as Map<String, dynamic>;
+        final role = data['role']?.toString() ?? '';
+        final namaMhs = data['nama']?.toString() ?? 'Pengguna';
+        final classId = data['class_id']?.toString().trim() ?? '';
+        final classCode = data['class_code']?.toString().trim() ?? '';
+
+        if ((role != 'mahasiswa' && role != 'aslab' && role != 'dosen') ||
+            classId.isEmpty ||
+            classCode.isEmpty) {
+          await FirebaseAuth.instance.signOut();
+          _showSnackbar(
+              'Akses ditolak. Akun belum terhubung ke kelas yang aktif.');
+          return;
+        }
+
+        // Perbaiki data pengguna jika field penting belum ada
+        final updateData = <String, Object>{};
+        if (!data.containsKey('role')) {
+          updateData['role'] = 'mahasiswa';
+        }
+        if (!data.containsKey('status_pretest')) {
+          updateData['status_pretest'] = 'BELUM DIAMBIL';
+        }
+        if (!data.containsKey('status_posttest')) {
+          updateData['status_posttest'] = 'BELUM DIAMBIL';
+        }
+        if (updateData.isNotEmpty) {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(uid)
+              .set(updateData, SetOptions(merge: true));
+        }
         if (mounted) {
           if (role == 'mahasiswa') {
             Navigator.pushReplacement(
@@ -180,7 +191,7 @@ class _SignInPageState extends State<SignInPage> {
                       controller: _emailOrUsernameController,
                       decoration: const InputDecoration(
                         border: InputBorder.none,
-                        hintText: 'Masukkan email atau NPM (Mahasiswa)',
+                        hintText: 'Masukkan email Pengguna',
                         hintStyle:
                             TextStyle(color: Colors.black38, fontSize: 13),
                         contentPadding:

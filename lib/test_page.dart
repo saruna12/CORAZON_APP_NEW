@@ -370,7 +370,7 @@ class _TestPageState extends State<TestPage> {
 
     double skorAkhir =
         totalSoal.isNotEmpty ? (jawabanBenar / totalSoal.length) * 100 : 0.0;
-    String statusKelulusan = skorAkhir >= 60 ? 'LULUS' : 'TIDAK LULUS';
+    const String statusHasil = 'SELESAI';
 
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
@@ -397,12 +397,12 @@ class _TestPageState extends State<TestPage> {
         if (widget.testType == 'Pre-Test') {
           batch.update(mhsRef, {
             'nilai_pretest': skorAkhir.round(),
-            'status_pretest': statusKelulusan,
+            'status_pretest': statusHasil,
           });
         } else {
           batch.update(mhsRef, {
             'nilai_postest': skorAkhir.round(),
-            'status_postest': statusKelulusan,
+            'status_postest': statusHasil,
           });
         }
 
@@ -417,7 +417,7 @@ class _TestPageState extends State<TestPage> {
           'nama': namaMhs,
           'npm': npmMhs,
           'skor': skorAkhir.round(),
-          'status': statusKelulusan,
+          'status': statusHasil,
           'waktu_selesai': FieldValue.serverTimestamp(),
         });
 
@@ -425,7 +425,7 @@ class _TestPageState extends State<TestPage> {
         await batch.commit();
 
         if (mounted) {
-          _showResultDialog(skorAkhir.round(), statusKelulusan);
+          _showResultDialog(skorAkhir.round(), statusHasil);
         }
       }
     } catch (e) {
@@ -462,7 +462,7 @@ class _TestPageState extends State<TestPage> {
             Text("STATUS: $status",
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: status == 'LULUS' ? Colors.green : Colors.red)),
+                    color: status == 'SELESAI' ? Colors.green : Colors.grey)),
           ],
         ),
         actions: [

@@ -2,11 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-class HasilPretestPage extends StatelessWidget {
+class HasilPretestPage extends StatefulWidget {
   final bool isDosen;
   const HasilPretestPage({super.key, this.isDosen = false});
 
+  @override
+  State<HasilPretestPage> createState() => _HasilPretestPageState();
+}
+
+class _HasilPretestPageState extends State<HasilPretestPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
   final Color maroonPrimary = const Color(0xFF6B1D2F);
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +28,7 @@ class HasilPretestPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF9F6F6),
       appBar: AppBar(
         title: Text(
-          isDosen ? 'Pantau Perkembangan Mahasiswa' : 'Grafik Skor Kamu',
+          widget.isDosen ? 'Pantau Perkembangan Mahasiswa' : 'Grafik Skor Kamu',
           style: const TextStyle(
               color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
         ),
@@ -22,7 +36,7 @@ class HasilPretestPage extends StatelessWidget {
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
-      body: isDosen
+      body: widget.isDosen
           ? _buildTampilanDosen(context)
           : _buildTampilanMahasiswa(context),
     );
@@ -69,230 +83,281 @@ class HasilPretestPage extends StatelessWidget {
         }
 
         final docs = snapshot.data!.docs;
+        final query = _searchQuery.trim().toLowerCase();
+        final filteredDocs = docs.where((doc) {
+          if (query.isEmpty) return true;
+          final data = doc.data() as Map<String, dynamic>;
+          final searchableText = [
+            data['nama'],
+            data['npm'],
+            data['email'],
+          ]
+              .where((value) => value != null)
+              .map((value) => value.toString())
+              .join(' ')
+              .toLowerCase();
+          return searchableText.contains(query);
+        }).toList();
 
         return Column(
           children: [
-            // Header Tabel
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              color: maroonPrimary,
-              child: const Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    child: Text('No',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (value) => setState(() => _searchQuery = value),
+                decoration: InputDecoration(
+                  hintText: 'Cari nama, NPM, atau email mahasiswa',
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _searchQuery.isEmpty
+                      ? null
+                      : IconButton(
+                          tooltip: 'Hapus pencarian',
+                          icon: const Icon(Icons.clear_rounded),
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() => _searchQuery = '');
+                          },
+                        ),
+                  filled: true,
+                  fillColor: Colors.white,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
-                  Expanded(
-                    flex: 3,
-                    child: Text('Nama, NPM & Email',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: Colors.grey.shade200),
                   ),
-                  SizedBox(
-                    width: 45,
-                    child: Text('Pre',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
-                  ),
-                  SizedBox(
-                    width: 45,
-                    child: Text('Post',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
-                  ),
-                  SizedBox(
-                    width: 65,
-                    child: Text('Status',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12)),
-                  ),
-                ],
+                ),
               ),
             ),
+            if (filteredDocs.isEmpty)
+              const Expanded(
+                child: Center(
+                  child:
+                      Text('Tidak ada mahasiswa yang cocok dengan pencarian.'),
+                ),
+              )
+            else ...[
+              // Header Tabel
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                color: maroonPrimary,
+                child: const Row(
+                  children: [
+                    SizedBox(
+                      width: 28,
+                      child: Text('No',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ),
+                    Expanded(
+                      flex: 3,
+                      child: Text('Nama, NPM & Email',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ),
+                    SizedBox(
+                      width: 45,
+                      child: Text('Pre',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ),
+                    SizedBox(
+                      width: 45,
+                      child: Text('Post',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ),
+                    SizedBox(
+                      width: 65,
+                      child: Text('Status',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12)),
+                    ),
+                  ],
+                ),
+              ),
 
-            // List Mahasiswa
-            Expanded(
-              child: ListView.builder(
-                itemCount: docs.length,
-                itemBuilder: (context, index) {
-                  final data = docs[index].data() as Map<String, dynamic>;
-                  String nama = data['nama'] ?? '-';
-                  String npm = data['npm'] ?? '-';
-                  String email = data['email'] ?? '-';
-                  int nilaiPre = data['nilai_pretest'] ?? 0;
-                  int nilaiPost = data['nilai_posttest'] ?? 0;
-                  String statusPre = data['status_pretest'] ?? 'BELUM DIAMBIL';
-                  String statusPost =
-                      data['status_posttest'] ?? 'BELUM DIAMBIL';
+              // List Mahasiswa
+              Expanded(
+                child: ListView.builder(
+                  itemCount: filteredDocs.length,
+                  itemBuilder: (context, index) {
+                    final data =
+                        filteredDocs[index].data() as Map<String, dynamic>;
+                    String nama = data['nama'] ?? '-';
+                    String npm = data['npm'] ?? '-';
+                    String email = data['email'] ?? '-';
+                    int nilaiPre = data['nilai_pretest'] ?? 0;
+                    int nilaiPost = data['nilai_posttest'] ?? 0;
+                    String statusPre =
+                        data['status_pretest'] ?? 'BELUM DIAMBIL';
+                    String statusPost =
+                        data['status_posttest'] ?? 'BELUM DIAMBIL';
 
-                  // Status akhir: lulus kalau keduanya lulus
-                  bool sudahKeduanya = statusPre != 'BELUM DIAMBIL' &&
-                      statusPost != 'BELUM DIAMBIL';
-                  bool lulusKeduanya =
-                      statusPre == 'LULUS' && statusPost == 'LULUS';
+                    // Status akhir hanya menunjukkan kelengkapan pengerjaan.
+                    bool sudahKeduanya = statusPre != 'BELUM DIAMBIL' &&
+                        statusPost != 'BELUM DIAMBIL';
+                    String statusAkhir = sudahKeduanya ? 'SELESAI' : 'PROSES';
+                    Color statusColor =
+                        sudahKeduanya ? Colors.green : Colors.orange;
 
-                  String statusAkhir = !sudahKeduanya
-                      ? 'BELUM LENGKAP'
-                      : lulusKeduanya
-                          ? 'LULUS'
-                          : 'TIDAK LULUS';
+                    bool isGanjil = index % 2 == 0;
 
-                  Color statusColor = !sudahKeduanya
-                      ? Colors.orange
-                      : lulusKeduanya
-                          ? Colors.green
-                          : Colors.red;
-
-                  bool isGanjil = index % 2 == 0;
-
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: isGanjil ? Colors.white : const Color(0xFFFAF7F7),
-                      border: Border(
-                        bottom: BorderSide(color: Colors.grey.shade100),
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 12),
+                      decoration: BoxDecoration(
+                        color:
+                            isGanjil ? Colors.white : const Color(0xFFFAF7F7),
+                        border: Border(
+                          bottom: BorderSide(color: Colors.grey.shade100),
+                        ),
                       ),
-                    ),
-                    child: Row(
-                      children: [
-                        // No
-                        SizedBox(
-                          width: 28,
-                          child: Text(
-                            '${index + 1}',
-                            style: TextStyle(
-                                fontSize: 12, color: Colors.grey.shade600),
+                      child: Row(
+                        children: [
+                          // No
+                          SizedBox(
+                            width: 28,
+                            child: Text(
+                              '${index + 1}',
+                              style: TextStyle(
+                                  fontSize: 12, color: Colors.grey.shade600),
+                            ),
                           ),
-                        ),
 
-                        // Nama, NPM & Email
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                nama,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.bold, fontSize: 13),
+                          // Nama, NPM & Email
+                          Expanded(
+                            flex: 3,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  nama,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  npm,
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey.shade500),
+                                ),
+                                Text(
+                                  email,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: Colors.grey.shade400),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Nilai Pretest
+                          SizedBox(
+                            width: 45,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusPre == 'BELUM DIAMBIL'
+                                    ? Colors.grey.shade100
+                                    : Colors.blue.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                statusPre == 'BELUM DIAMBIL'
+                                    ? '-'
+                                    : '$nilaiPre',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusPre == 'BELUM DIAMBIL'
+                                        ? Colors.grey
+                                        : Colors.blue.shade700),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 45 - 45), // spacer
+                          // Nilai Posttest
+                          SizedBox(
+                            width: 45,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusPost == 'BELUM DIAMBIL'
+                                    ? Colors.grey.shade100
+                                    : Colors.green.shade50,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                statusPost == 'BELUM DIAMBIL'
+                                    ? '-'
+                                    : '$nilaiPost',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusPost == 'BELUM DIAMBIL'
+                                        ? Colors.grey
+                                        : Colors.green.shade700),
+                              ),
+                            ),
+                          ),
+
+                          // Status Akhir
+                          SizedBox(
+                            width: 65,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: statusColor.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                statusAkhir,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusColor),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                              Text(
-                                npm,
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey.shade500),
-                              ),
-                              Text(
-                                email,
-                                style: TextStyle(
-                                    fontSize: 10, color: Colors.grey.shade400),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Nilai Pretest
-                        SizedBox(
-                          width: 45,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusPre == 'BELUM DIAMBIL'
-                                  ? Colors.grey.shade100
-                                  : Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              statusPre == 'BELUM DIAMBIL' ? '-' : '$nilaiPre',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: statusPre == 'BELUM DIAMBIL'
-                                      ? Colors.grey
-                                      : Colors.blue.shade700),
                             ),
                           ),
-                        ),
-
-                        const SizedBox(width: 45 - 45), // spacer
-                        // Nilai Posttest
-                        SizedBox(
-                          width: 45,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusPost == 'BELUM DIAMBIL'
-                                  ? Colors.grey.shade100
-                                  : Colors.green.shade50,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              statusPost == 'BELUM DIAMBIL'
-                                  ? '-'
-                                  : '$nilaiPost',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: statusPost == 'BELUM DIAMBIL'
-                                      ? Colors.grey
-                                      : Colors.green.shade700),
-                            ),
-                          ),
-                        ),
-
-                        // Status Akhir
-                        SizedBox(
-                          width: 65,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: statusColor.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              statusAkhir == 'BELUM LENGKAP'
-                                  ? 'PROSES'
-                                  : statusAkhir,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
-                                  color: statusColor),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ),
-            ),
+            ],
           ],
         );
       },
@@ -379,11 +444,9 @@ class HasilPretestPage extends StatelessWidget {
                         Text(statusPre,
                             style: TextStyle(
                                 fontSize: 10,
-                                color: statusPre == 'LULUS'
+                                color: statusPre == 'SELESAI'
                                     ? Colors.green
-                                    : statusPre == 'TIDAK LULUS'
-                                        ? Colors.red
-                                        : Colors.grey)),
+                                    : Colors.grey)),
                       ],
                     ),
                     Column(
@@ -414,11 +477,9 @@ class HasilPretestPage extends StatelessWidget {
                         Text(statusPost,
                             style: TextStyle(
                                 fontSize: 10,
-                                color: statusPost == 'LULUS'
+                                color: statusPost == 'SELESAI'
                                     ? Colors.green
-                                    : statusPost == 'TIDAK LULUS'
-                                        ? Colors.red
-                                        : Colors.grey)),
+                                    : Colors.grey)),
                       ],
                     ),
                   ],
