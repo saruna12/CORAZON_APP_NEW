@@ -52,7 +52,10 @@ class _SignInPageState extends State<SignInPage> {
 
         if (!userDoc.exists || userDoc.data() == null) {
           await FirebaseAuth.instance.signOut();
-          _showSnackbar('Akses ditolak. Akun belum terdaftar di aplikasi.');
+          final isArchived = await _isArchivedAccount(inputUser);
+          _showSnackbar(isArchived
+              ? 'Akun telah dihapus. Silakan hubungi admin.'
+              : 'Akses ditolak. Akun belum terdaftar di aplikasi.');
           return;
         }
 
@@ -107,12 +110,24 @@ class _SignInPageState extends State<SignInPage> {
     } on FirebaseAuthException catch (e) {
       String pesanError = 'Login gagal. Periksa kembali email & password Anda.';
       if (e.code == 'user-not-found') {
-        pesanError =
-            'Akun tidak ditemukan. Silakan registrasi terlebih dahulu.';
+        final isArchived = await _isArchivedAccount(inputUser);
+        pesanError = isArchived
+            ? 'Akun telah dihapus. Silakan hubungi admin.'
+            : 'Email tidak terdaftar. Silakan registrasi terlebih dahulu.';
       } else if (e.code == 'wrong-password') {
         pesanError = 'Password salah.';
       } else if (e.code == 'invalid-email') {
-        pesanError = 'Format email salah (Gunakan email saat daftar).';
+        final isArchived = await _isArchivedAccount(inputUser);
+        pesanError = isArchived
+            ? 'Akun telah dihapus. Silakan hubungi admin.'
+            : 'Email atau username tidak terdaftar.';
+      } else if (e.code == 'invalid-credential') {
+        final isArchived = await _isArchivedAccount(inputUser);
+        pesanError = isArchived
+            ? 'Akun telah dihapus. Silakan hubungi admin.'
+            : inputUser.contains('@')
+                ? 'Email atau password salah.'
+                : 'Email atau username tidak terdaftar.';
       }
       _showSnackbar(pesanError);
     } catch (e) {
@@ -137,17 +152,28 @@ class _SignInPageState extends State<SignInPage> {
       return (data['email'] ?? inputUser).toString();
     }
 
-    final queryByNpm = await FirebaseFirestore.instance
-        .collection('users')
-        .where('npm', isEqualTo: inputUser)
-        .limit(1)
-        .get();
-    if (queryByNpm.docs.isNotEmpty) {
-      final data = queryByNpm.docs.first.data();
-      return (data['email'] ?? inputUser).toString();
+    for (final identityField in ['npm', 'mpm', 'nip']) {
+      final queryByIdentity = await FirebaseFirestore.instance
+          .collection('users')
+          .where(identityField, isEqualTo: inputUser)
+          .limit(1)
+          .get();
+      if (queryByIdentity.docs.isNotEmpty) {
+        final data = queryByIdentity.docs.first.data();
+        return (data['email'] ?? inputUser).toString();
+      }
     }
 
     return inputUser;
+  }
+
+  Future<bool> _isArchivedAccount(String inputUser) async {
+    final archivedUsers =
+        FirebaseFirestore.instance.collection('archived_users');
+    final field = inputUser.contains('@') ? 'email' : 'npm';
+    final snapshot =
+        await archivedUsers.where(field, isEqualTo: inputUser).limit(1).get();
+    return snapshot.docs.isNotEmpty;
   }
 
   void _showSnackbar(String pesan) {

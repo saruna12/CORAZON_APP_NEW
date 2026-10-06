@@ -19,33 +19,6 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
   bool _isUploading = false;
   String _statusPesan = "";
 
-  // Mengubah inputan kunci dari Excel (bisa Huruf A-D atau Angka 0-3) secara aman
-  int _konversiKunciKeIndeks(dynamic value) {
-    if (value == null) return 0;
-
-    String nilaiString = value.toString().trim().toUpperCase();
-
-    // Jika di excel diisi angka murni (0, 1, 2, 3)
-    if (nilaiString == '0') return 0;
-    if (nilaiString == '1') return 1;
-    if (nilaiString == '2') return 2;
-    if (nilaiString == '3') return 3;
-
-    // Jika di excel diisi huruf teks (A, B, C, D)
-    switch (nilaiString) {
-      case 'A':
-        return 0;
-      case 'B':
-        return 1;
-      case 'C':
-        return 2;
-      case 'D':
-        return 3;
-      default:
-        return 0;
-    }
-  }
-
   // 1. Fungsi memilih file Excel (.xlsx)
   Future<void> _pilihFileExcel() async {
     try {
@@ -122,15 +95,11 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
       for (int i = 0; i < table.maxRows; i++) {
         var row = table.rows[i];
 
-        if (row.length < 7) continue;
+        if (row.length < 2) continue;
 
         var cellNo = row[0]?.value;
         var cellSoal = row[1]?.value;
-        var cellA = row[2]?.value;
-        var cellB = row[3]?.value;
-        var cellC = row[4]?.value;
-        var cellD = row[5]?.value;
-        var cellKunci = row[6]?.value;
+        var cellBobot = row.length > 2 ? row[2]?.value : null;
 
         String nomorStr = cellNo?.toString().trim() ?? "";
         String soalStr = cellSoal?.toString().trim() ?? "";
@@ -141,20 +110,14 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
           continue;
         }
 
-        String opsiA = cellA?.toString().trim() ?? "";
-        String opsiB = cellB?.toString().trim() ?? "";
-        String opsiC = cellC?.toString().trim() ?? "";
-        String opsiD = cellD?.toString().trim() ?? "";
-
-        int jawabanBenarIndeks = _konversiKunciKeIndeks(cellKunci);
-        List<String> daftarOpsi = [opsiA, opsiB, opsiC, opsiD];
+        final bobot = num.tryParse(cellBobot?.toString() ?? '') ?? 20;
 
         DocumentReference docRef = collectionTarget.doc();
 
         batch.set(docRef, {
           'pertanyaan': soalStr,
-          'opsi': daftarOpsi,
-          'jawaban_benar': jawabanBenarIndeks,
+          'tipe': 'essay',
+          'bobot': bobot,
           'created_at': FieldValue.serverTimestamp(),
         });
 
@@ -219,7 +182,7 @@ class _ImportSoalPosttestPageState extends State<ImportSoalPosttestPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    "Pastikan file .xlsx memiliki urutan kolom berikut:\nKolom 1: No | Kolom 2: Pertanyaan | Kolom 3: Opsi A | Kolom 4: Opsi B | Kolom 5: Opsi C | Kolom 6: Opsi D | Kolom 7: Kunci (A/B/C/D)",
+                    "Pastikan file .xlsx memiliki urutan kolom berikut:\nKolom 1: No | Kolom 2: Pertanyaan Essay | Kolom 3: Bobot Nilai (opsional)",
                     textAlign: TextAlign.center,
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                   ),

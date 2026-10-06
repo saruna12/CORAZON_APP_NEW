@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/services.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -31,7 +32,7 @@ class _RegisterPageState extends State<RegisterPage> {
   Future<void> _prosesRegistrasi() async {
     String name = _nameController.text.trim();
     String npm = _npmController.text.trim();
-    String email = _emailController.text.trim();
+    String email = _emailController.text.trim().toLowerCase();
     String password = _passwordController.text.trim();
     String classCode = _classCodeController.text.trim();
 
@@ -50,6 +51,7 @@ class _RegisterPageState extends State<RegisterPage> {
     }
 
     setState(() => _isLoading = true);
+    User? createdUser;
 
     try {
       final classSnapshot = await FirebaseFirestore.instance
@@ -73,7 +75,8 @@ class _RegisterPageState extends State<RegisterPage> {
       UserCredential userCredential = await FirebaseAuth.instance
           .createUserWithEmailAndPassword(email: email, password: password);
 
-      String? uid = userCredential.user?.uid;
+      createdUser = userCredential.user;
+      String? uid = createdUser?.uid;
 
       if (uid != null) {
         // 2. Simpan data tambahan (Nama, NIM/NIP, Role) di Cloud Firestore
@@ -108,10 +111,27 @@ class _RegisterPageState extends State<RegisterPage> {
         pesanError = 'Format email salah.';
       }
       _showSnackbar(pesanError);
+    } on FirebaseException catch (e) {
+      if (createdUser != null) await _rollbackCreatedUser(createdUser);
+      if (e.code == 'permission-denied') {
+        _showSnackbar(
+            'Registrasi gagal: Firebase tidak mengizinkan penyimpanan profil. Periksa aturan Firestore.');
+      } else {
+        _showSnackbar('Registrasi gagal: ${e.message ?? e.code}');
+      }
     } catch (e) {
+      if (createdUser != null) await _rollbackCreatedUser(createdUser);
       _showSnackbar('Gagal menyimpan data: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _rollbackCreatedUser(User user) async {
+    try {
+      await user.delete();
+    } catch (_) {
+      await FirebaseAuth.instance.signOut();
     }
   }
 
@@ -201,6 +221,7 @@ class _RegisterPageState extends State<RegisterPage> {
                     child: TextField(
                       controller: _npmController,
                       keyboardType: TextInputType.number,
+                      inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                       decoration: const InputDecoration(
                           border: InputBorder.none,
                           hintText: 'Harus berupa angka',
@@ -254,7 +275,6 @@ class _RegisterPageState extends State<RegisterPage> {
                       textCapitalization: TextCapitalization.characters,
                       decoration: const InputDecoration(
                           border: InputBorder.none,
-                          hintText: 'Contoh: Anatomi2026',
                           contentPadding: EdgeInsets.symmetric(
                               horizontal: 12, vertical: 12)),
                     ),

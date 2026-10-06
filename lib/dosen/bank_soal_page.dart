@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:excel/excel.dart' as excel_pkg;
-import '../import_soal_page.dart'; // ⬅️ FIX: Mundur 1 folder untuk membaca file Import Excel !
 
 class BankSoalPage extends StatefulWidget {
   const BankSoalPage({super.key});
@@ -21,6 +20,7 @@ class _BankSoalPageState extends State<BankSoalPage> {
   // Controller untuk Form Input Soal Baru
   final _formKey = GlobalKey<FormState>();
   final _pertanyaanController = TextEditingController();
+  final _bobotController = TextEditingController(text: '20');
   final List<TextEditingController> _opsiController =
       List.generate(4, (_) => TextEditingController());
   int _jawabanBenarIndex = 0; // 0=A, 1=B, 2=C, 3=D
@@ -120,25 +120,30 @@ class _BankSoalPageState extends State<BankSoalPage> {
       int jumlahSoalBerhasil = 0;
       WriteBatch batch = FirebaseFirestore.instance.batch();
 
-      // TARGET: bank_soal/daftar_soal (dengan field jenis_soal)
+      // Simpan pretest dan posttest pada paket yang dibaca masing-masing alur.
       CollectionReference collectionTarget = FirebaseFirestore.instance
           .collection('bank_soal')
-          .doc('paket_utama')
+          .doc(_jenisImport == 'posttest'
+              ? 'paket_utama_posttest'
+              : 'paket_utama_pretest')
           .collection('daftar_soal');
 
       // Iterasi baris Excel
       for (int i = 1; i < table.maxRows; i++) {
         var row = table.rows[i];
 
-        if (row.length < 7) continue;
+        final isPosttest = _jenisImport == 'posttest';
+        if ((!isPosttest && row.length < 7) || (isPosttest && row.length < 2)) {
+          continue;
+        }
 
         // REVISI: cellNo dan nomorStr dihapus karena tidak terpakai (Menghilangkan Warning)
         var cellSoal = row[1]?.value;
-        var cellA = row[2]?.value;
-        var cellB = row[3]?.value;
-        var cellC = row[4]?.value;
-        var cellD = row[5]?.value;
-        var cellKunci = row[6]?.value;
+        var cellA = isPosttest ? null : row[2]?.value;
+        var cellB = isPosttest ? null : row[3]?.value;
+        var cellC = isPosttest ? null : row[4]?.value;
+        var cellD = isPosttest ? null : row[5]?.value;
+        var cellKunci = isPosttest ? null : row[6]?.value;
 
         String soalStr = cellSoal?.toString().trim() ?? "";
 
@@ -146,23 +151,33 @@ class _BankSoalPageState extends State<BankSoalPage> {
           continue;
         }
 
-        String opsiA = cellA?.toString().trim() ?? "";
-        String opsiB = cellB?.toString().trim() ?? "";
-        String opsiC = cellC?.toString().trim() ?? "";
-        String opsiD = cellD?.toString().trim() ?? "";
-
-        int jawabanBenarIndeks = _konversiKunciKeIndeks(cellKunci);
-        List<String> daftarOpsi = [opsiA, opsiB, opsiC, opsiD];
-
         DocumentReference docRef = collectionTarget.doc();
 
-        batch.set(docRef, {
-          'pertanyaan': soalStr,
-          'opsi': daftarOpsi,
-          'jawaban_benar': jawabanBenarIndeks,
-          'jenis_soal': _jenisImport, // ← TAMBAH FIELD INI
-          'created_at': FieldValue.serverTimestamp(),
-        });
+        if (isPosttest) {
+          final bobot = num.tryParse(
+                  row.length > 2 ? row[2]?.value?.toString() ?? '' : '') ??
+              20;
+          batch.set(docRef, {
+            'pertanyaan': soalStr,
+            'tipe': 'essay',
+            'bobot': bobot,
+            'created_at': FieldValue.serverTimestamp(),
+          });
+        } else {
+          String opsiA = cellA?.toString().trim() ?? "";
+          String opsiB = cellB?.toString().trim() ?? "";
+          String opsiC = cellC?.toString().trim() ?? "";
+          String opsiD = cellD?.toString().trim() ?? "";
+          int jawabanBenarIndeks = _konversiKunciKeIndeks(cellKunci);
+
+          batch.set(docRef, {
+            'pertanyaan': soalStr,
+            'opsi': [opsiA, opsiB, opsiC, opsiD],
+            'jawaban_benar': jawabanBenarIndeks,
+            'jenis_soal': 'pretest',
+            'created_at': FieldValue.serverTimestamp(),
+          });
+        }
 
         jumlahSoalBerhasil++;
       }
@@ -172,9 +187,17 @@ class _BankSoalPageState extends State<BankSoalPage> {
         setState(() {
           _isUploading = false;
           _fileTerpilih = null;
-          _statusPesan =
-              "🔥 BERHASIL! $jumlahSoalBerhasil soal $_jenisImport sukses dimasukkan!";
+          _statusPesan = "";
         });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                  '$jumlahSoalBerhasil soal $_jenisImport berhasil ditambahkan.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
       } else {
         setState(() {
           _isUploading = false;
@@ -215,10 +238,12 @@ class _BankSoalPageState extends State<BankSoalPage> {
                   children: [
                     Icon(Icons.add_task, color: maroonPrimary),
                     const SizedBox(width: 10),
-                    const Text(
-                      'Tambah Soal Pretest Baru',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    Text(
+                      _jenisSoalPilihan == 'posttest'
+                          ? 'Tambah Soal Essay Posttest'
+                          : 'Tambah Soal Pilihan Ganda Pretest',
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -235,37 +260,56 @@ class _BankSoalPageState extends State<BankSoalPage> {
                       v!.isEmpty ? 'Pertanyaan wajib diisi' : null,
                 ),
                 const SizedBox(height: 10),
-                ...List.generate(4, (index) {
-                  String labelOpsi = String.fromCharCode(65 + index);
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8.0),
-                    child: TextFormField(
-                      controller: _opsiController[index],
-                      decoration: InputDecoration(
-                        labelText: 'Pilihan Konten Opsi $labelOpsi',
-                        prefixIcon: Icon(Icons.arrow_right,
-                            color: maroonPrimary, size: 18),
+                if (_jenisSoalPilihan != 'posttest') ...[
+                  ...List.generate(4, (index) {
+                    String labelOpsi = String.fromCharCode(65 + index);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: TextFormField(
+                        controller: _opsiController[index],
+                        decoration: InputDecoration(
+                          labelText: 'Pilihan Konten Opsi $labelOpsi',
+                          prefixIcon: Icon(Icons.arrow_right,
+                              color: maroonPrimary, size: 18),
+                        ),
+                        validator: (v) => v!.isEmpty
+                            ? 'Pilihan $labelOpsi wajib diisi'
+                            : null,
                       ),
-                      validator: (v) =>
-                          v!.isEmpty ? 'Pilihan $labelOpsi wajib diisi' : null,
+                    );
+                  }),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<int>(
+                    initialValue: _jawabanBenarIndex,
+                    decoration: const InputDecoration(
+                      labelText: 'Kunci Jawaban Benar',
+                      prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
                     ),
-                  );
-                }),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  initialValue: _jawabanBenarIndex,
-                  decoration: const InputDecoration(
-                    labelText: 'Kunci Jawaban Benar',
-                    prefixIcon: Icon(Icons.verified_user_outlined, size: 18),
+                    items: const [
+                      DropdownMenuItem(value: 0, child: Text('Opsi A')),
+                      DropdownMenuItem(value: 1, child: Text('Opsi B')),
+                      DropdownMenuItem(value: 2, child: Text('Opsi C')),
+                      DropdownMenuItem(value: 3, child: Text('Opsi D')),
+                    ],
+                    onChanged: (val) =>
+                        setState(() => _jawabanBenarIndex = val!),
                   ),
-                  items: const [
-                    DropdownMenuItem(value: 0, child: Text('Opsi A')),
-                    DropdownMenuItem(value: 1, child: Text('Opsi B')),
-                    DropdownMenuItem(value: 2, child: Text('Opsi C')),
-                    DropdownMenuItem(value: 3, child: Text('Opsi D')),
-                  ],
-                  onChanged: (val) => setState(() => _jawabanBenarIndex = val!),
-                ),
+                ],
+                if (_jenisSoalPilihan == 'posttest')
+                  TextFormField(
+                    controller: _bobotController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Bobot Nilai',
+                      prefixIcon: Icon(Icons.score_outlined),
+                    ),
+                    validator: (value) {
+                      final bobot = num.tryParse(value?.trim() ?? '');
+                      return bobot == null || bobot <= 0
+                          ? 'Bobot harus berupa angka positif'
+                          : null;
+                    },
+                  ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   initialValue: _jenisSoalPilihan,
@@ -277,10 +321,11 @@ class _BankSoalPageState extends State<BankSoalPage> {
                     DropdownMenuItem(value: 'pretest', child: Text('Pretest')),
                     DropdownMenuItem(
                         value: 'posttest', child: Text('Posttest')),
-                    DropdownMenuItem(
-                        value: 'keduanya', child: Text('Pretest & Posttest')),
                   ],
-                  onChanged: (val) => setState(() => _jenisSoalPilihan = val!),
+                  onChanged: (val) => setState(() {
+                    _jenisSoalPilihan = val!;
+                    _jenisImport = val == 'posttest' ? 'posttest' : 'pretest';
+                  }),
                 ),
                 const SizedBox(height: 24),
                 ElevatedButton(
@@ -306,21 +351,28 @@ class _BankSoalPageState extends State<BankSoalPage> {
     );
   }
 
-  // Menyimpan data ke /bank_soal/paket_utama/daftar_soal dengan field jenis_soal
+  // Menyimpan data ke paket bank soal sesuai jenis ujian.
   void _simpanSoalKeFirestore() async {
     if (_formKey.currentState!.validate()) {
+      final isPosttest = _jenisSoalPilihan == 'posttest';
+      final data = <String, dynamic>{
+        'pertanyaan': _pertanyaanController.text.trim(),
+        'created_at': FieldValue.serverTimestamp(),
+      };
+      if (isPosttest) {
+        data['tipe'] = 'essay';
+        data['bobot'] = num.parse(_bobotController.text.trim());
+      } else {
+        data['opsi'] = _opsiController.map((c) => c.text.trim()).toList();
+        data['jawaban_benar'] = _jawabanBenarIndex;
+        data['jenis_soal'] = 'pretest';
+      }
+
       await FirebaseFirestore.instance
           .collection('bank_soal')
-          .doc('paket_utama')
+          .doc(isPosttest ? 'paket_utama_posttest' : 'paket_utama_pretest')
           .collection('daftar_soal')
-          .add({
-        'pertanyaan': _pertanyaanController.text.trim(),
-        'opsi': _opsiController.map((c) => c.text.trim()).toList(),
-        'jawaban_benar': _jawabanBenarIndex,
-        'jenis_soal': _jenisSoalPilihan, // ← TAMBAH FIELD INI
-        'created_at':
-            FieldValue.serverTimestamp(), // Digunakan untuk urutan orderBy
-      });
+          .add(data);
 
       if (mounted) {
         Navigator.pop(context); // Tutup bottom sheet setelah sukses
@@ -335,9 +387,56 @@ class _BankSoalPageState extends State<BankSoalPage> {
         for (var c in _opsiController) {
           c.clear();
         }
+        _bobotController.text = '20';
         setState(() {
           _jenisSoalPilihan = 'pretest'; // Reset ke default
         });
+      }
+    }
+  }
+
+  Future<void> _hapusSoal(String soalId, String pertanyaan) async {
+    final setujuHapus = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Hapus Soal'),
+        content: Text('Yakin ingin menghapus soal ini?\n\n$pertanyaan'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Hapus', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (setujuHapus != true) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('bank_soal')
+          .doc(_jenisImport == 'posttest'
+              ? 'paket_utama_posttest'
+              : 'paket_utama_pretest')
+          .collection('daftar_soal')
+          .doc(soalId)
+          .delete();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Soal berhasil dihapus.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal menghapus soal: $error')),
+        );
       }
     }
   }
@@ -348,6 +447,7 @@ class _BankSoalPageState extends State<BankSoalPage> {
     for (var c in _opsiController) {
       c.dispose();
     }
+    _bobotController.dispose();
     super.dispose();
   }
 
@@ -363,27 +463,6 @@ class _BankSoalPageState extends State<BankSoalPage> {
         ),
         backgroundColor: maroonPrimary,
         iconTheme: const IconThemeData(color: Colors.white),
-        // ➕ Menambahkan tombol navigasi Import Excel di pojok kanan atas AppBar
-        actions: [
-          TextButton.icon(
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ImportSoalPage()),
-              );
-            },
-            icon: const Icon(Icons.drive_folder_upload_rounded,
-                color: Colors.white, size: 20),
-            label: const Text(
-              "Import Excel",
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13),
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
       ),
       body: Column(
         children: [
@@ -486,12 +565,14 @@ class _BankSoalPageState extends State<BankSoalPage> {
           ),
           const SizedBox(height: 8),
 
-          // Mengambil list soal secara live dari bank_soal/paket_utama/daftar_soal
+          // Mengambil soal dari paket sesuai tipe import yang dipilih.
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
                   .collection('bank_soal')
-                  .doc('paket_utama')
+                  .doc(_jenisImport == 'posttest'
+                      ? 'paket_utama_posttest'
+                      : 'paket_utama_pretest')
                   .collection('daftar_soal')
                   .orderBy('created_at', descending: true)
                   .snapshots(),
@@ -500,10 +581,13 @@ class _BankSoalPageState extends State<BankSoalPage> {
                   return const Center(child: CircularProgressIndicator());
                 }
 
-                // Menyaring dokumen agar hanya memproses dokumen soal asli
+                // Tampilkan hanya tipe soal yang sesuai dengan pilihan dropdown.
+                final isPosttest = _jenisImport == 'posttest';
                 var docs = snapshot.data?.docs.where((doc) {
                       var data = doc.data() as Map<String, dynamic>;
-                      return data.containsKey('pertanyaan');
+                      final isEssay = data['tipe'] == 'essay';
+                      return data.containsKey('pertanyaan') &&
+                          (isPosttest ? isEssay : !isEssay);
                     }).toList() ??
                     [];
 
@@ -520,9 +604,12 @@ class _BankSoalPageState extends State<BankSoalPage> {
                   itemBuilder: (context, qIndex) {
                     var item = docs[qIndex].data() as Map<String, dynamic>;
                     String pertanyaan = item['pertanyaan'] ?? '';
+                    final isEssay = item['tipe'] == 'essay';
                     List<String> opsi = List<String>.from(item['opsi'] ?? []);
                     int jawabanBenar = item['jawaban_benar'] ?? 0;
-                    String jenisSoal = item['jenis_soal'] ?? 'pretest';
+                    String jenisSoal = isEssay
+                        ? 'posttest essay'
+                        : (item['jenis_soal'] ?? 'pretest');
 
                     Color badgeColor;
                     if (jenisSoal == 'pretest') {
@@ -583,8 +670,27 @@ class _BankSoalPageState extends State<BankSoalPage> {
                                     ),
                                   ],
                                 ),
-                                const Icon(Icons.more_vert,
-                                    color: Colors.grey, size: 20),
+                                PopupMenuButton<String>(
+                                  tooltip: 'Opsi soal',
+                                  onSelected: (value) {
+                                    if (value == 'hapus') {
+                                      _hapusSoal(docs[qIndex].id, pertanyaan);
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: 'hapus',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.delete_outline,
+                                              color: Colors.red),
+                                          SizedBox(width: 8),
+                                          Text('Hapus'),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ],
                             ),
                             const SizedBox(height: 12),
@@ -596,61 +702,70 @@ class _BankSoalPageState extends State<BankSoalPage> {
                                   fontSize: 14),
                             ),
                             const SizedBox(height: 12),
-                            ...List.generate(opsi.length, (aIndex) {
-                              bool isCorrect = aIndex == jawabanBenar;
+                            if (isEssay)
+                              Text(
+                                'Bobot: ${item['bobot'] ?? 20} poin',
+                                style: TextStyle(
+                                    color: Colors.orange.shade800,
+                                    fontWeight: FontWeight.w600),
+                              )
+                            else
+                              ...List.generate(opsi.length, (aIndex) {
+                                bool isCorrect = aIndex == jawabanBenar;
 
-                              return Container(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                padding: const EdgeInsets.all(12),
-                                decoration: BoxDecoration(
-                                  color: isCorrect
-                                      ? Colors.green[50]
-                                      : Colors.grey[50],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(
+                                return Container(
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 4),
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
                                     color: isCorrect
-                                        ? Colors.green.shade300
-                                        : Colors.grey.shade200,
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 12,
-                                      backgroundColor: isCorrect
-                                          ? Colors.green[600]
-                                          : Colors.grey[300],
-                                      child: Text(
-                                        String.fromCharCode(65 + aIndex),
-                                        style: const TextStyle(
-                                            fontSize: 10,
-                                            color: Colors.white,
-                                            fontWeight: FontWeight.bold),
-                                      ),
+                                        ? Colors.green[50]
+                                        : Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: isCorrect
+                                          ? Colors.green.shade300
+                                          : Colors.grey.shade200,
+                                      width: 1,
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        opsi[aIndex],
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: isCorrect
-                                              ? Colors.green[900]
-                                              : textDark,
-                                          fontWeight: isCorrect
-                                              ? FontWeight.bold
-                                              : FontWeight.normal,
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 12,
+                                        backgroundColor: isCorrect
+                                            ? Colors.green[600]
+                                            : Colors.grey[300],
+                                        child: Text(
+                                          String.fromCharCode(65 + aIndex),
+                                          style: const TextStyle(
+                                              fontSize: 10,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold),
                                         ),
                                       ),
-                                    ),
-                                    if (isCorrect)
-                                      const Icon(Icons.check_circle,
-                                          color: Colors.green, size: 18),
-                                  ],
-                                ),
-                              );
-                            }),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Text(
+                                          opsi[aIndex],
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: isCorrect
+                                                ? Colors.green[900]
+                                                : textDark,
+                                            fontWeight: isCorrect
+                                                ? FontWeight.bold
+                                                : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                                      if (isCorrect)
+                                        const Icon(Icons.check_circle,
+                                            color: Colors.green, size: 18),
+                                    ],
+                                  ),
+                                );
+                              }),
                           ],
                         ),
                       ),

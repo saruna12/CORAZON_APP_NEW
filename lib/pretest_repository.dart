@@ -17,7 +17,7 @@ class PretestRepository {
   static final ValueNotifier<bool> statusUjianLive = statusPretestLive;
 
   // 1. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian & Token Pretest di Firestore
-  static Future<void> ubahStatusUjian(bool statusBaru,
+  static Future<bool> ubahStatusUjian(bool statusBaru,
       {String? kunciAkses}) async {
     try {
       Map<String, dynamic> data = {
@@ -37,13 +37,15 @@ class PretestRepository {
       if (kunciAkses != null) {
         kunciPretestLive.value = kunciAkses.trim();
       }
+      return true;
     } catch (e) {
       debugPrint("Gagal mengubah status akses ujian pretest: $e");
+      return false;
     }
   }
 
   // 1b. Fungsi untuk Dosen: Mengubah Status ON/OFF Ujian & Token Posttest di Firestore
-  static Future<void> ubahStatusPosttest(bool statusBaru,
+  static Future<bool> ubahStatusPosttest(bool statusBaru,
       {String? kunciAkses}) async {
     try {
       Map<String, dynamic> data = {
@@ -63,8 +65,10 @@ class PretestRepository {
       if (kunciAkses != null) {
         kunciPosttestLive.value = kunciAkses.trim();
       }
+      return true;
     } catch (e) {
       debugPrint("Gagal mengubah status akses ujian posttest: $e");
+      return false;
     }
   }
 
@@ -139,6 +143,33 @@ class PretestRepository {
       return true;
     } catch (e) {
       debugPrint("Gagal menyimpan nilai posttest ke database: $e");
+      return false;
+    }
+  }
+
+  static Future<bool> simpanJawabanEssayPosttest({
+    required String userId,
+    required List<Map<String, dynamic>> jawaban,
+    required int durasiDetik,
+  }) async {
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'jawaban_posttest': jawaban,
+        'jawaban': jawaban,
+        'status': 'MENUNGGU PENILAIAN',
+        'nilai_akhir': null,
+        'durasi_detik': durasiDetik,
+        'status_posttest': 'MENUNGGU PENILAIAN',
+        'nilai_posttest': null,
+        'waktu_posttest': FieldValue.serverTimestamp(),
+        'waktu_kirim_posttest': FieldValue.serverTimestamp(),
+        'durasi_posttest': durasiDetik,
+      }, SetOptions(merge: true));
+
+      debugPrint('Jawaban essay posttest mahasiswa $userId berhasil direkam!');
+      return true;
+    } catch (e) {
+      debugPrint('Gagal menyimpan jawaban essay posttest ($userId): $e');
       return false;
     }
   }

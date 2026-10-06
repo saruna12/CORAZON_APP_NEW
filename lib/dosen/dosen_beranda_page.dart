@@ -27,12 +27,13 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
   // terutama untuk menyembunyikan menu yang khusus dosen.
   String _role = 'aslab';
 
-  // Stream ringkasan cepat: dihitung dari collection users yang sama
-  // dengan yang dipakai halaman "Pantau Perkembangan", supaya angkanya
-  // selalu konsisten dengan data di sana.
-  final Stream<QuerySnapshot> _mahasiswaStream = FirebaseFirestore.instance
-      .collection('users')
-      .where('role', isEqualTo: 'mahasiswa')
+  // Ambil semua pengguna agar ringkasan dapat menampilkan setiap role.
+  final Stream<QuerySnapshot> _usersStream =
+      FirebaseFirestore.instance.collection('users').snapshots();
+  final Stream<DocumentSnapshot> _classSettingsStream = FirebaseFirestore
+      .instance
+      .collection('class_settings')
+      .doc('app')
       .snapshots();
 
   @override
@@ -68,11 +69,11 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
         return;
       }
 
-      // Ambil nama dan NIP/NIM pengguna (aslab atau dosen)
+      // Ambil nama dan nomor identitas pengguna (aslab atau dosen).
       if (snapshot.exists && snapshot.data() != null) {
         final data = snapshot.data() as Map<String, dynamic>;
-        _dosenNama = data['nama'] ?? 'Pengguna';
-        _dosenNIP = data['nip'] ?? 'NIP/NIM Tidak Terbaca';
+        _dosenNama = data['nama']?.toString() ?? 'Pengguna';
+        _dosenNIP = _readIdentityNumber(data);
       }
 
       if (mounted) {
@@ -92,6 +93,15 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
       await FirebaseAuth.instance.signOut();
       _redirectToSignIn();
     }
+  }
+
+  String _readIdentityNumber(Map<String, dynamic> data) {
+    const identityFields = ['mpm', 'MPM', 'nip', 'NIP', 'npm', 'NPM'];
+    for (final field in identityFields) {
+      final value = data[field]?.toString().trim();
+      if (value != null && value.isNotEmpty) return value;
+    }
+    return 'NIP/NIM Tidak Terbaca';
   }
 
   void _redirectToSignIn() {
@@ -192,10 +202,9 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                       color: Colors.white70, size: 24),
                   tooltip: 'Keluar Aplikasi',
                   onPressed: () async {
-                    final navigator = Navigator.of(context);
                     await FirebaseAuth.instance.signOut();
                     if (!mounted) return;
-                    navigator.popUntil((route) => route.isFirst);
+                    _redirectToSignIn();
                   },
                 ),
               ],
@@ -330,74 +339,100 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
     );
   }
 
-  // Ringkasan cepat: total mahasiswa, selesai pretest, selesai posttest.
-  // Dihitung dari collection & field yang sama dengan halaman
-  // "Pantau Perkembangan" (users.status_pretest / status_posttest)
-  // supaya angkanya selalu konsisten dengan halaman itu.
+  // Ringkasan cepat: statistik mahasiswa dan jumlah akun berdasarkan role.
   Widget _buildRingkasanCepat() {
-    return StreamBuilder<QuerySnapshot>(
-      stream: _mahasiswaStream,
-      builder: (context, snapshot) {
-        int total = 0;
-        int selesaiPretest = 0;
-        int selesaiPosttest = 0;
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _classSettingsStream,
+      builder: (context, classSettingsSnapshot) {
+        final activeClassCode = classSettingsSnapshot.data?.data() is Map
+            ? ((classSettingsSnapshot.data!.data()
+                        as Map<String, dynamic>)['active_code']
+                    ?.toString()
+                    .trim()
+                    .toLowerCase() ??
+                '')
+            : '';
 
-        if (snapshot.hasData) {
-          final docs = snapshot.data!.docs;
-          total = docs.length;
-          for (final doc in docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            final statusPre = data['status_pretest'] ?? 'BELUM DIAMBIL';
-            final statusPost = data['status_posttest'] ?? 'BELUM DIAMBIL';
-            if (statusPre != 'BELUM DIAMBIL') selesaiPretest++;
-            if (statusPost != 'BELUM DIAMBIL') selesaiPosttest++;
-          }
-        }
+        return StreamBuilder<QuerySnapshot>(
+          stream: _usersStream,
+          builder: (context, snapshot) {
+            int total = 0;
+            int selesaiPretest = 0;
+            int selesaiPosttest = 0;
 
-        final bool isLoading =
-            snapshot.connectionState == ConnectionState.waiting;
+            if (snapshot.hasData) {
+              for (final doc in snapshot.data!.docs) {
+                final data = doc.data() as Map<String, dynamic>;
+                final role = data['role']?.toString().toLowerCase();
+                // Hanya akun mahasiswa aktif yang masuk seluruh statistik.
+                if (role != 'mahasiswa' || data['is_aktif'] == false) continue;
+                final classCode =
+                    data['class_code']?.toString().trim().toLowerCase();
+                if (activeClassCode.isEmpty || classCode != activeClassCode) {
+                  continue;
+                }
 
-        return Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                value: isLoading ? '-' : '$total',
-                label: 'mahasiswa',
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                value: isLoading ? '-' : '$selesaiPretest/$total',
-                label: 'pretest',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MahasiswaBelumUjianPage(
-                      jenisUjian: 'Pretest',
-                      statusField: 'status_pretest',
+                total++;
+
+                final statusPre = data['status_pretest'] ?? 'BELUM DIAMBIL';
+                final statusPost = data['status_posttest'] ?? 'BELUM DIAMBIL';
+                if (statusPre == 'SELESAI') selesaiPretest++;
+                if (statusPost == 'SELESAI') selesaiPosttest++;
+              }
+            }
+
+            final bool isLoading = classSettingsSnapshot.connectionState ==
+                    ConnectionState.waiting ||
+                activeClassCode.isEmpty ||
+                snapshot.connectionState == ConnectionState.waiting;
+
+            return Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        value: isLoading ? '-' : '$total',
+                        label: 'mahasiswa',
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                value: isLoading ? '-' : '$selesaiPosttest/$total',
-                label: 'posttest',
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const MahasiswaBelumUjianPage(
-                      jenisUjian: 'Posttest',
-                      statusField: 'status_posttest',
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        value: isLoading ? '-' : '$selesaiPretest/$total',
+                        label: 'pretest',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MahasiswaBelumUjianPage(
+                              jenisUjian: 'Pretest',
+                              statusField: 'status_pretest',
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        value: isLoading ? '-' : '$selesaiPosttest/$total',
+                        label: 'posttest',
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const MahasiswaBelumUjianPage(
+                              jenisUjian: 'Posttest',
+                              statusField: 'status_posttest',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
+              ],
+            );
+          },
         );
       },
     );
@@ -468,7 +503,14 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                 label: 'Pretest',
                 isOpen: isPreOpen,
                 onChanged: (val) async {
-                  await PretestRepository.ubahStatusUjian(val);
+                  final success = await PretestRepository.ubahStatusUjian(val);
+                  if (!success && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Pretest gagal diubah. Periksa izin Firestore.')),
+                    );
+                  }
                 },
               );
             },
@@ -481,7 +523,15 @@ class _DosenBerandaPageState extends State<DosenBerandaPage> {
                 label: 'Posttest',
                 isOpen: isPostOpen,
                 onChanged: (val) async {
-                  await PretestRepository.ubahStatusPosttest(val);
+                  final success =
+                      await PretestRepository.ubahStatusPosttest(val);
+                  if (!success && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                          content: Text(
+                              'Posttest gagal diubah. Periksa izin Firestore.')),
+                    );
+                  }
                 },
               );
             },

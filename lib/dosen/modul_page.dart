@@ -221,7 +221,7 @@ class _ModulPageState extends State<ModulPage> {
                     const SizedBox(height: 8),
                     Text(
                       bolehMengelola
-                          ? "Halo Admin/Dosen, silakan klik tombol '+' di kanan bawah untuk meng-input modul materi kuliah pertama !"
+                          ? "Silakan klik tombol + untuk meng-input modul materi kuliah pertama !"
                           : "Dosen atau Laboran belum meng-upload materi kuliah. Harap tunggu atau hubungi tim akademis ya !",
                       textAlign: TextAlign.center,
                       style: const TextStyle(color: Colors.grey, fontSize: 14),

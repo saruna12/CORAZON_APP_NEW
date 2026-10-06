@@ -110,7 +110,7 @@ class _GerbangPosttestPageState extends State<GerbangPosttestPage> {
               const Divider(),
               const SizedBox(height: 12),
               _buildInfoRow(
-                  Icons.timer_rounded, 'Durasi Pengerjaan', '30 Detik'),
+                  Icons.timer_rounded, 'Durasi Pengerjaan', '10 Menit'),
               const SizedBox(height: 8),
               _buildInfoRow(Icons.quiz_rounded, 'Jumlah Soal', '5 Soal'),
               const SizedBox(height: 24),

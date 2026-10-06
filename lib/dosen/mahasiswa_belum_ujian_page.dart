@@ -30,6 +30,7 @@ class MahasiswaBelumUjianPage extends StatelessWidget {
         stream: FirebaseFirestore.instance
             .collection('users')
             .where('role', isEqualTo: 'mahasiswa')
+            .where('is_aktif', isEqualTo: true)
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -42,7 +43,10 @@ class MahasiswaBelumUjianPage extends StatelessWidget {
 
           final belumMengerjakan = (snapshot.data?.docs ?? []).where((doc) {
             final data = doc.data() as Map<String, dynamic>;
-            return (data[statusField] ?? 'BELUM DIAMBIL') == 'BELUM DIAMBIL';
+            if (data['is_aktif'] != true) return false;
+            // Status MENUNGGU PENILAIAN berarti posttest sudah dikirim,
+            // tetapi belum selesai dinilai sehingga tetap masuk daftar.
+            return data[statusField] != 'SELESAI';
           }).toList();
 
           if (belumMengerjakan.isEmpty) {
